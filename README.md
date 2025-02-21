@@ -1,15 +1,21 @@
-# JanRenderer (WIP)
+# **JanRenderer (WIP)**
 
 Rendering engine built with Vulkan written in C++17 and Zig.
-<!--
-## Features
--->
-## Getting Started
 
-TODO
+## Features
+
+- Rendering engine built with Vulkan
+- Written in C++17 and Zig
+- Using Depth buffer
+- Generate Mipmaps
+- MSAA (MultiSampling Anti-Aliasing) support
+- Compute Shader
+
+## **Getting Started**
+
 Import the built JanRenderer library and Types.zig. (see src/TestApp).
 
-## Build
+## **Build**
 
 1. Build using zig's build system in Visual Studio Code (see shortcuts below).
 2. Executable program and Library files are created in the bin folder.
@@ -19,8 +25,6 @@ Import the built JanRenderer library and Types.zig. (see src/TestApp).
 - build: Ctrl+Shift+B
 - debug: F5
 - run: Ctrl+F5
-
-## Contribute
 
 ### Vscode extensions
 
@@ -39,6 +43,10 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 3. Types (including classes, structs, enums, typedefs, etc): PascalCase
 4. Enums: PascalCase
 
-## Credits
+## **Credits**
 
-1. ["volk"]
+1. [volk](https://github.com/zeux/volk)
+2. [glfw](https://github.com/glfw/glfw)
+3. [cglm](https://github.com/recp/cglm)
+4. [stb](https://github.com/nothings/stb)
+5. [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader)
