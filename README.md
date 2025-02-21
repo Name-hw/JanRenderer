@@ -2,7 +2,7 @@
 
 Rendering engine built with Vulkan written in C++17 and Zig.
 
-## Features
+## **Features**
 
 - Rendering engine built with Vulkan
 - Written in C++17 and Zig
