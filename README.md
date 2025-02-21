@@ -13,7 +13,7 @@ Rendering engine built with Vulkan written in C++17 and Zig.
 
 ## **Getting Started**
 
-Import the built JanRenderer library and Types.zig. (see src/TestApp).
+Import the built JanRenderer library and Types.zig. (see [this](https://github.com/Name-hw/JanRenderer/blob/main/src/TestApp/main.zig)).
 
 ## **Build**
 
