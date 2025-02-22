@@ -14,15 +14,13 @@ jobs:
     name: Build
     runs-on: windows-latest
     steps:
+    - name: Checkout
+      uses: actions/checkout@v4.2.2
+
+    - name: Setup Zig Compiler
     - uses: mlugg/setup-zig@v1.2.1
       with:
        version: 0.13.0
-       
-    - name: init
-      run: zig init
 
     - name: Build
       run: zig build
-      
-    - name: Run
-      run: zig build run
