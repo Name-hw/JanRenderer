@@ -1,5 +1,7 @@
 # **JanRenderer (WIP)**
 
+[![.github/workflows/CI.yml](https://github.com/Name-hw/JanRenderer/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Name-hw/JanRenderer/actions/workflows/CI.yml)
+
 Rendering engine built with Vulkan written in C++17 and Zig.
 
 ## **Features**
