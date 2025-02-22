@@ -90,8 +90,8 @@ pub fn build(b: *std.Build) !void {
 
     // JrClasses.h (unused)
     // There are many bugs in zig, so use JrClasses.hpp that I created instead of this automatically generated header file.
-    _ = JrClasses_lib.getEmittedH();
-    JrClasses_lib.installHeader(b.path(".zig-cache/JrClasses.h"), "JrClasses.h");
+    //_ = JrClasses_lib.getEmittedH();
+    //JrClasses_lib.installHeader(b.path(".zig-cache/JrClasses.h"), "JrClasses.h");
 
     b.installArtifact(JrClasses_lib);
 
