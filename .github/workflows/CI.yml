@@ -1,0 +1,25 @@
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+  schedule:
+  - cron: "0 15 * * *"
+  workflow_dispatch:
+  
+jobs:
+  test:
+    name: Build
+    runs-on: windows-latest
+    steps:
+    - uses: mlugg/setup-zig@v1.2.1
+      with:
+       version: 0.13.0
+       
+    - name: Build
+      run: zig build run
+      
+    - name: Run
+      run: zig build run
