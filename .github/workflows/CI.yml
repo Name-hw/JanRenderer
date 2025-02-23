@@ -22,7 +22,9 @@ jobs:
       with:
         vcpkgDirectory: '${{ github.workspace }}/vcpkg_installed'
         runVcpkgInstall: true
-    - run: ls -al
+        
+    - run: tree
+    
     - name: Setup Zig Compiler
       uses: mlugg/setup-zig@v1.2.1
       with:
