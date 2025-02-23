@@ -27,6 +27,7 @@ jobs:
       with:
         vcpkgDirectory: '${{ runner.workspace }}/vcpkg_installed'
         runVcpkgInstall: true
+    - run: ls
 
     - name: Build
       run: zig build
