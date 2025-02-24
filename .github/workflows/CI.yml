@@ -20,7 +20,7 @@ jobs:
     - name: run-vcpkg
       uses: lukka/run-vcpkg@v11.5
       with:
-        #vcpkgDirectory: '${{ github.workspace }}/vcpkg_installed'
+        additionalArgs: --x-install-root=${{ github.workspace }}/vcpkg_installed
         runVcpkgInstall: true
 
     - run: tree
