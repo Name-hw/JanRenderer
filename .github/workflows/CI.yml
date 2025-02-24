@@ -17,11 +17,13 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4.2.2
 
-    # - name: run-vcpkg
-    #   uses: lukka/run-vcpkg@v11.5
-    #   with:
-    #     vcpkgDirectory: '${{ github.workspace }}/vcpkg_installed'
-    #     runVcpkgInstall: true
+    - name: run-vcpkg
+      uses: lukka/run-vcpkg@v11.5
+      with:
+        #vcpkgDirectory: '${{ github.workspace }}/vcpkg_installed'
+        runVcpkgInstall: true
+
+    - run: tree
     
     - name: Setup Zig Compiler
       uses: mlugg/setup-zig@v1.2.1
