@@ -1,12 +1,12 @@
 on:
-  #push:
+  # push:
   #  branches:
   #  - main
-  #pull_request:
+  # pull_request:
   #  branches:
   #  - main
-  #schedule:
-  #- cron: "0 15 * * *"
+  # schedule:
+  # - cron: "0 15 * * *"
   workflow_dispatch:
   
 jobs:
@@ -17,13 +17,11 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4.2.2
 
-    - name: run-vcpkg
-      uses: lukka/run-vcpkg@v11.5
-      with:
-        vcpkgDirectory: '${{ github.workspace }}/vcpkg_installed'
-        runVcpkgInstall: true
-        
-    - run: tree
+    # - name: run-vcpkg
+    #   uses: lukka/run-vcpkg@v11.5
+    #   with:
+    #     vcpkgDirectory: '${{ github.workspace }}/vcpkg_installed'
+    #     runVcpkgInstall: true
     
     - name: Setup Zig Compiler
       uses: mlugg/setup-zig@v1.2.1
