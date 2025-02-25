@@ -1,4 +1,4 @@
-#include "JanRenderer.hpp"
+#include <JanRenderer.hpp>
 
 // stb
 #define STB_IMAGE_IMPLEMENTATION
@@ -2342,17 +2342,16 @@ void JanRenderer::cleanupSwapChain() {
   vkDestroySwapchainKHR(device, swapChain, nullptr);
 }
 
-JanRenderer *janRenderer_new(const char *applicationName_, int width,
-                             int height) {
+JanRenderer *jrNew(const char *applicationName_, int width, int height) {
   JanRenderer *newJanRenderer =
       new JanRenderer(applicationName_, width, height);
 
   return newJanRenderer;
 };
 
-void janRenderer_delete(JanRenderer *self) { delete self; };
+void jrDelete(JanRenderer *self) { delete self; };
 
-void janRenderer_run(JanRenderer *self) {
+void jrRun(JanRenderer *self) {
   try {
     self->run();
   } catch (const std::exception &e) {

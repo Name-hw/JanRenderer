@@ -63,7 +63,8 @@
         "iterator": "c",
         "__config": "cpp",
         "random": "cpp",
-        "algorithm": "cpp"
+        "algorithm": "cpp",
+        "*.zig": "cpp"
     },
     "[hlsl]": {
         "editor.defaultFormatter": "slevesque.shader"

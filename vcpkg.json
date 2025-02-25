@@ -3,6 +3,7 @@
     "glfw3",
     "stb",
     "tinyobjloader",
-    "volk"
+    "volk",
+    "cglm"
   ]
 }

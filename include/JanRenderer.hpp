@@ -367,10 +367,10 @@ private:
 };
 
 extern "C" {
-__declspec(dllexport) JanRenderer *janRenderer_new(const char *applicationName_,
-                                                   int width, int height);
-__declspec(dllexport) void janRenderer_delete(JanRenderer *self);
-__declspec(dllexport) void janRenderer_run(JanRenderer *self);
+__declspec(dllexport) JanRenderer *jrNew(const char *applicationName_,
+                                         int width, int height);
+__declspec(dllexport) void jrDelete(JanRenderer *self);
+__declspec(dllexport) void jrRun(JanRenderer *self);
 }
 
 #endif

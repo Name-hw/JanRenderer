@@ -1,13 +1,12 @@
 const std = @import("std");
-//const cglm = @import("cglm");
 const cglm = @cImport({
     @cDefine("CGLM_FORCE_DEPTH_ZERO_TO_ONE", "");
     @cInclude("cglm/struct.h");
 });
 
-const JrCamera = extern struct {
-    position: cglm.vec3s = cglm.GLMS_VEC3_ZERO,
-    velocity: cglm.vec3s = cglm.GLMS_VEC3_ZERO,
+pub const JrCamera = extern struct {
+    position: cglm.vec3s = cglm.glms_vec3_zero(),
+    velocity: cglm.vec3s = cglm.glms_vec3_zero(),
 
     pitch: f32 = 0.0,
     yaw: f32 = 0.0,
@@ -30,21 +29,23 @@ const JrCamera = extern struct {
     }
 };
 
-export fn jrCamera_new() callconv(.C) *JrCamera {
-    const allocator = std.heap.page_allocator;
+pub export fn jrCamera_new() callconv(.C) *JrCamera {
+    const allocator = std.heap.c_allocator;
     const newJrCamera = allocator.create(JrCamera) catch unreachable;
+
+    newJrCamera.* = JrCamera{};
 
     return newJrCamera;
 }
 
-export fn jrCamera_getRotationMatrix(self: *JrCamera) callconv(.C) cglm.mat4s {
-    return self.getRotationMatrix();
+pub export fn jrCamera_getRotationMatrix(self: *JrCamera) callconv(.C) cglm.mat4s {
+    return self.*.getRotationMatrix();
 }
 
-export fn jrCamera_getViewMatrix(self: *JrCamera) callconv(.C) cglm.mat4s {
-    return self.getRotationMatrix();
+pub export fn jrCamera_getViewMatrix(self: *JrCamera) callconv(.C) cglm.mat4s {
+    return self.*.getRotationMatrix();
 }
 
-export fn jrCamera_update(self: *JrCamera) callconv(.C) void {
-    self.update();
+pub export fn jrCamera_update(self: *JrCamera) callconv(.C) void {
+    self.*.update();
 }
