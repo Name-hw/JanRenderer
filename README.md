@@ -19,8 +19,9 @@ Import the built JanRenderer library and Types.zig. (see [this](https://github.c
 
 ## **Build**
 
-1. Build using zig's build system in Visual Studio Code (see shortcuts below).
-2. Executable program and Library files are created in the bin folder.
+1. First, install [vcpkg](https://vcpkg.io/) and run 'vcpkg install'.
+2. Build using zig's build system in Visual Studio Code (see shortcuts below).
+3. Executable program and Library files are created in the 'bin' folder.
 
 ### Shortcuts
 
@@ -47,8 +48,8 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 
 ## **Credits**
 
-1. [volk](https://github.com/zeux/volk)
-2. [glfw](https://github.com/glfw/glfw)
-3. [cglm](https://github.com/recp/cglm)
-4. [stb](https://github.com/nothings/stb)
-5. [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader)
+- [volk](https://github.com/zeux/volk)
+- [glfw](https://github.com/glfw/glfw)
+- [cglm](https://github.com/recp/cglm)
+- [stb](https://github.com/nothings/stb)
+- [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader)

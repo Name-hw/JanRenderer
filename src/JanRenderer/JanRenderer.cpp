@@ -453,7 +453,7 @@ void JanRenderer::initJrClasses() {
   jrCamera_update(camera);
   FreeLibrary(JrClasses_lib);
   */
-  camera = jrCamera_new();
+  // camera = jrCamera_new();
 }
 
 // initVolk
