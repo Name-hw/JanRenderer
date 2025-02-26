@@ -7,7 +7,7 @@
             "type": "cppvsdbg",
             "request": "launch",
             "name": "Debug",
-            "program": "${workspaceFolder}/bin/TestApp",
+            "program": "${workspaceFolder}/zig-out/bin/TestApp",
             "args": [],
             "cwd": "${workspaceFolder}/bin",
             "preLaunchTask": "zig build"

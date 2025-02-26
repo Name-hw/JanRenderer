@@ -14,7 +14,7 @@ fn findCSourceFiles(b: *std.Build, absoluteDir: std.fs.Dir) ![]const []const u8 
 
     var src_files_arrayList = std.ArrayList([]const u8).init(b.allocator);
     while (try dir_walker.next()) |entry| {
-        if (entry.kind == .file) {
+        if (entry.kind == .file and mem.endsWith(u8, entry.basename, "c") and mem.endsWith(u8, entry.basename, "h")) {
             const path =
                 try std.mem.replaceOwned(u8, b.allocator, entry.path, "\\", "/");
             try src_files_arrayList.append(path);
@@ -36,13 +36,13 @@ fn addPkg_C(b: *std.Build, pkg_name: []const u8, target: std.Build.ResolvedTarge
     var absoluteDir = try cwd.openDir(pkg_dir.getPath(b), .{});
     defer absoluteDir.close();
 
-    std.log.debug("{s}", .{try absoluteDir.realpathAlloc(b.allocator, "")});
+    //std.log.debug("{s}", .{try absoluteDir.realpathAlloc(b.allocator, "")}); //print directory of pkg
 
     var absoluteDir_src = try absoluteDir.openDir("src", .{ .iterate = true });
     defer absoluteDir_src.close();
 
     // pkg_lib
-    const pkg_lib = b.addSharedLibrary(.{
+    const pkg_lib = b.addStaticLibrary(.{
         .name = pkg_name,
         .target = target,
         .optimize = optimize,
@@ -54,9 +54,6 @@ fn addPkg_C(b: *std.Build, pkg_name: []const u8, target: std.Build.ResolvedTarge
     const src_files = try findCSourceFiles(b, absoluteDir_src);
 
     pkg_lib.addCSourceFiles(.{ .root = pkg_dir_src, .files = src_files, .flags = &.{"-std=c99"} });
-
-    // installArtifact
-    b.installArtifact(pkg_lib);
 
     return pkg_lib;
 }
@@ -77,10 +74,10 @@ pub fn build(b: *std.Build) !void {
     // optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    // const optimize_pkg = .ReleaseFast;
+    //const optimize_pkg = .ReleaseFast;
 
-    // cglm_lib
-    // const cglm_lib = try addPkg_C(b, "cglm", target, optimize_pkg);
+    // glfw
+    b.installBinFile("vcpkg_installed/x64-windows/bin/glfw3.dll", "glfw3.dll");
 
     // JrClasses_lib
     const JrClasses_lib = b.addStaticLibrary(.{
@@ -125,8 +122,6 @@ pub fn build(b: *std.Build) !void {
     // location when the user invokes the "install" step (the default step when
     // running `zig build`).
     b.installArtifact(JanRenderer_lib);
-    const JanRenderer_lib_install_artifact = b.addInstallArtifact(JanRenderer_lib, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
-    b.getInstallStep().dependOn(&JanRenderer_lib_install_artifact.step);
 
     // TestApp
     const TestApp_exe = b.addExecutable(.{
@@ -137,13 +132,12 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    TestApp_exe.addIncludePath(b.path("include/"));
     TestApp_exe.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
     TestApp_exe.linkSystemLibrary("glfw3dll");
     TestApp_exe.linkLibrary(JanRenderer_lib);
 
     b.installArtifact(TestApp_exe);
-    const exe_install_artifact = b.addInstallArtifact(TestApp_exe, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
+    const exe_install_artifact = b.addInstallArtifact(TestApp_exe, .{});
     b.getInstallStep().dependOn(&exe_install_artifact.step);
 
     // This *creates* a Run step in the build graph, to be executed when another

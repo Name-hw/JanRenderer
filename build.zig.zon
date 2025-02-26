@@ -23,9 +23,9 @@
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
     .dependencies = .{
-        //.cglm = .{
-        //    .url = "https://github.com/recp/cglm/archive/refs/tags/v0.9.6.tar.gz",
-        //    .hash = "1220afe8e19148b6447706c7f4febcb15dc1f7a2c066c676d7fe02884c67cf3135bb",
+        //.glfw = .{
+        //    .url = "https://github.com/glfw/glfw/archive/refs/tags/3.4.tar.gz",
+        //    .hash = "1220c46ebcac607065f942193b82a21b87213fca4b0d50c83461f8f5e22955fcb88f",
         //},
     },
     .paths = .{
