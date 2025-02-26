@@ -119,8 +119,8 @@ const size_t MAX_FRAMES_IN_FLIGHT = 2;
 
 const uint32_t PARTICLE_COUNT = 8192;
 
-const std::string MODEL_PATH = "../src/JanRenderer/models/viking_room.obj";
-const std::string TEXTURE_PATH = "../src/JanRenderer/textures/viking_room.png";
+const std::string MODEL_PATH = "assets/models/viking_room.obj";
+const std::string TEXTURE_PATH = "assets/textures/viking_room.png";
 
 const std::vector<const char *> validationLayers = {
     "VK_LAYER_KHRONOS_validation"};

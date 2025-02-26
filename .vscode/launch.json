@@ -9,7 +9,7 @@
             "name": "Debug",
             "program": "${workspaceFolder}/zig-out/bin/TestApp",
             "args": [],
-            "cwd": "${workspaceFolder}/bin",
+            "cwd": "${workspaceFolder}/zig-out/bin/",
             "preLaunchTask": "zig build"
         },
     ]

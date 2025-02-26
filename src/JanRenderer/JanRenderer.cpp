@@ -1054,8 +1054,8 @@ void JanRenderer::createComputeDescriptorSetLayout() {
 
 // initVulkan createGraphicsPipeline
 void JanRenderer::createGraphicsPipeline() {
-  auto vertShaderCode = readFile("../src/JanRenderer/shaders/vert.spv");
-  auto fragShaderCode = readFile("../src/JanRenderer/shaders/frag.spv");
+  auto vertShaderCode = readFile("assets/shaders/vert.spv");
+  auto fragShaderCode = readFile("assets/shaders/frag.spv");
 
   VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
   VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
@@ -1230,7 +1230,7 @@ void JanRenderer::createGraphicsPipeline() {
 
 // initVulkan createComputePipeline
 void JanRenderer::createComputePipeline() {
-  auto computeShaderCode = readFile("../src/JanRenderer/shaders/comp.spv");
+  auto computeShaderCode = readFile("assets/shaders/comp.spv");
 
   VkShaderModule computeShaderModule = createShaderModule(computeShaderCode);
 
