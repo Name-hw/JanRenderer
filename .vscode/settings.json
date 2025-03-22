@@ -7,5 +7,12 @@
     "zig.zls.enabled": "on",
     "[zig]": {
         "editor.defaultFormatter": "ziglang.vscode-zig"
+    },
+    "files.associations": {
+        "__config": "cpp",
+        "*.zig": "zig",
+        "__node_handle": "cpp",
+        "ios": "cpp",
+        "ostream": "cpp"
     }
 }

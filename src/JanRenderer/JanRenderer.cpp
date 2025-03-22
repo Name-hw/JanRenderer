@@ -62,9 +62,9 @@ JanRenderer::JanRenderer(const char *applicationName_, int width, int height)
 JanRenderer::~JanRenderer() {};
 
 void JanRenderer::run() {
-  initJrClasses();
   initVolk();
   initWindow();
+  initJrClasses();
   initVulkan();
   mainLoop();
   cleanup();
@@ -436,26 +436,6 @@ VkShaderModule JanRenderer::createShaderModule(const std::vector<char> &code) {
   return shaderModule;
 }
 
-// initJrClasses
-void JanRenderer::initJrClasses() {
-  /*
-  JrClasses_lib = LoadLibrary("JrClasses.dll");
-
-  // JrCamera
-  JrCamera_new jrCamera_new =
-      (JrCamera_new)GetProcAddress(JrClasses_lib, "jrCamera_new");
-  camera = jrCamera_new();
-
-  JrCamera_update jrCamera_update =
-      (JrCamera_new)GetProcAddress(JrClasses_lib, "jrCamera_update");
-  camera = jrCamera_new();
-
-  jrCamera_update(camera);
-  FreeLibrary(JrClasses_lib);
-  */
-  // camera = jrCamera_new();
-}
-
 // initVolk
 void JanRenderer::initVolk() {
   if (volkInitialize() != VK_SUCCESS) {
@@ -484,6 +464,31 @@ void JanRenderer::framebufferResizeCallback(GLFWwindow *window, int width,
                                             int height) {
   auto app = reinterpret_cast<JanRenderer *>(glfwGetWindowUserPointer(window));
   app->framebufferResized = true;
+}
+
+// initJrClasses
+void JanRenderer::initJrClasses() {
+  /*
+  JrClasses_lib = LoadLibrary("JrClasses.dll");
+
+  // JrCamera
+  JrCamera_new jrCamera_new =
+      (JrCamera_new)GetProcAddress(JrClasses_lib, "jrCamera_new");
+  camera = jrCamera_new();
+
+  JrCamera_update jrCamera_update =
+      (JrCamera_new)GetProcAddress(JrClasses_lib, "jrCamera_update");
+  camera = jrCamera_new();
+
+  jrCamera_update(camera);
+  FreeLibrary(JrClasses_lib);
+  */
+  camera = new JrCamera;
+  init(camera);
+
+  glfwSetKeyCallback(window, keyCallback);
+  glfwSetCursorPosCallback(window, cursorPositionCallback);
+  glfwSetScrollCallback(window, scrollCallback);
 }
 
 // initVulkan
@@ -2215,21 +2220,31 @@ void JanRenderer::recordComputeCommandBuffer(
 
 // mainLoop drawFrame updateUniformBuffer
 void JanRenderer::updateUniformBuffer(uint32_t currentImage) {
-  static auto startTime = std::chrono::high_resolution_clock::now();
+  // static auto startTime = std::chrono::high_resolution_clock::now();
 
-  auto currentTime = std::chrono::high_resolution_clock::now();
-  float time = std::chrono::duration<float, std::chrono::seconds::period>(
-                   currentTime - startTime)
-                   .count();
+  // auto currentTime = std::chrono::high_resolution_clock::now();
+  // float time = std::chrono::duration<float, std::chrono::seconds::period>(
+  //                  currentTime - startTime)
+  //                  .count();
+
+  // UniformBufferObject ubo{};
+  // ubo.model = glms_rotate(GLMS_MAT4_IDENTITY, time * glm_rad(90.0f),
+  //                         {0.0f, 0.0f, 1.0f});
+  // ubo.view =
+  //     glms_lookat({2.0f, 2.0f, 2.0f}, {0.0f, 0.0f, 0.0f}, {0.0f,
+  //     0.0f, 1.0f});
+  // ubo.proj = glms_perspective(
+  //     glm_rad(45.0f), swapChainExtent.width / (float)swapChainExtent.height,
+  //     0.1f, 10.0f);
+  // ubo.proj.raw[1][1] *= -1;
+  update(camera);
 
   UniformBufferObject ubo{};
-  ubo.model = glms_rotate(GLMS_MAT4_IDENTITY, time * glm_rad(90.0f),
-                          {0.0f, 0.0f, 1.0f});
-  ubo.view =
-      glms_lookat({2.0f, 2.0f, 2.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f});
+  ubo.model = GLMS_MAT4_IDENTITY;
+  ubo.view = getViewMatrix();
   ubo.proj = glms_perspective(
-      glm_rad(45.0f), swapChainExtent.width / (float)swapChainExtent.height,
-      0.1f, 10.0f);
+      glm_rad(camera->fov),
+      swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
   ubo.proj.raw[1][1] *= -1;
 
   memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));

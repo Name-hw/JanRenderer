@@ -1,9 +1,9 @@
 {
   "dependencies": [
-    "glfw3",
-    "stb",
-    "tinyobjloader",
     "volk",
-    "cglm"
+    "glfw3",
+    "cglm",
+    "stb",
+    "tinyobjloader"
   ]
 }

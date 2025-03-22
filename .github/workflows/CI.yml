@@ -1,14 +1,14 @@
 on:
   push:
-   branches:
-   - main
-  # pull_request:
-  #  branches:
-  #  - main
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   # schedule:
   # - cron: "0 15 * * *"
   workflow_dispatch:
-  
+
 jobs:
   test:
     name: Build
@@ -16,20 +16,20 @@ jobs:
     env:
       VCPKG_INSTALLED_DIR: ${{ github.workspace }}/vcpkg_installed
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4.2.2
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
 
-    - name: run-vcpkg
-      uses: lukka/run-vcpkg@v11.5
-      with:
-        runVcpkgInstall: true
+      - name: run-vcpkg
+        uses: lukka/run-vcpkg@v11.5
+        with:
+          runVcpkgInstall: true
 
-    - run: tree
-    
-    - name: Setup Zig Compiler
-      uses: mlugg/setup-zig@v1.2.1
-      with:
-       version: 0.13.0
+      - run: tree
 
-    - name: Build
-      run: zig build
+      - name: Setup Zig Compiler
+        uses: mlugg/setup-zig@v1.2.1
+        with:
+          version: 0.13.0
+
+      - name: Build
+        run: zig build

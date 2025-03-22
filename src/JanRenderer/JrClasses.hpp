@@ -1,26 +1,24 @@
 #pragma once
 
-// cglm
-#define CGLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <cglm/struct.h>
+#include <common.hpp>
 
 extern "C" {
-typedef struct JrCamera {
+struct JrCamera {
   vec3s position;
   vec3s velocity;
 
   float pitch;
   float yaw;
-} JrCamera;
-/*
-typedef JrCamera *(*JrCamera_new)();
-typedef mat4s (*JrCamera_getRotationMatrix)(JrCamera *);
-typedef mat4s (*JrCamera_getViewMatrix)(JrCamera *);
-typedef void (*JrCamera_update)(JrCamera *);
-*/
 
-JrCamera *jrCamera_new();
-mat4s jrCamera_getRotationMatrix(JrCamera *self);
-mat4s jrCamera_getViewMatrix(JrCamera *self);
-void jrCamera_update(JrCamera *self);
+  float speed;
+  float fov;
+};
+void init(JrCamera *);
+mat4s getRotationMatrix();
+mat4s getViewMatrix();
+void update(JrCamera *);
+void keyCallback(GLFWwindow *window, int key, int scancode, int action,
+                 int mods);
+void cursorPositionCallback(GLFWwindow *window, double xpos, double ypos);
+void scrollCallback(GLFWwindow *window, double xoffset, double yoffset);
 }

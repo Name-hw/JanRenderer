@@ -282,10 +282,7 @@ private:
                               uint32_t mipLevels);
   bool hasStencilComponent(VkFormat format);
   VkSampleCountFlagBits getMaxUsableSampleCount();
-  void createComputePipeline();
-
-  // initJrClasses
-  void initJrClasses();
+  VkShaderModule createShaderModule(const std::vector<char> &code);
 
   // initVolk
   void initVolk();
@@ -294,6 +291,9 @@ private:
   void initWindow();
   static void framebufferResizeCallback(GLFWwindow *window, int width,
                                         int height);
+
+  // initJrClasses
+  void initJrClasses();
 
   // initVulkan
   void initVulkan();
@@ -319,7 +319,7 @@ private:
   void createDescriptorSetLayout();
   void createComputeDescriptorSetLayout();
   void createGraphicsPipeline();
-  VkShaderModule createShaderModule(const std::vector<char> &code);
+  void createComputePipeline();
   void createCommandPools();
   void createColorResources();
   void createDepthResources();

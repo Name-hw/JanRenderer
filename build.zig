@@ -76,13 +76,20 @@ pub fn build(b: *std.Build) !void {
 
     //const optimize_pkg = .ReleaseFast;
 
+    // zmath
+    const zmath = b.dependency("zmath", .{});
+
+    // zflecs
+    const zflecs = b.dependency("zflecs", .{});
+
     // glfw
     b.installBinFile("vcpkg_installed/x64-windows/bin/glfw3.dll", "glfw3.dll");
+    b.installLibFile("vcpkg_installed/x64-windows/lib/glfw3dll.lib", "glfw3dll.lib");
 
     // JrClasses_lib
     const JrClasses_lib = b.addStaticLibrary(.{
         .name = "JrClasses",
-        .root_source_file = b.path("src/JanRenderer/JrClasses/JrCamera.zig"),
+        .root_source_file = b.path("src/JrClasses/JrClasses.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -91,15 +98,39 @@ pub fn build(b: *std.Build) !void {
     // JrClasses_lib vcpkg library
     JrClasses_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
     JrClasses_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+    // JrClasses_lib zig library
+    JrClasses_lib.root_module.addImport("zmath", zmath.module("root"));
+    JrClasses_lib.root_module.addImport("zflecs", zflecs.module("root"));
 
     // JrClasses.h (unused)
     // There are many bugs in zig, so use JrClasses.hpp that I created instead of
     // this automatically generated header file.
-    //_ = JrClasses_lib.getEmittedH();
-    // JrClasses_lib.installHeader(b.path(".zig-cache/JrClasses.h"),
-    // "JrClasses.h");
+    //const JrClasses_lib_header = JrClasses_lib.getEmittedH();
+    //JrClasses_lib.installHeader(JrClasses_lib_header, "");
 
     b.installArtifact(JrClasses_lib);
+    const JrClasses_lib_installArtifact = b.addInstallArtifact(JrClasses_lib, .{});
+    //JrClasses_lib_installArtifact.emitted_h = JrClasses_lib_header.;
+    b.getInstallStep().dependOn(&JrClasses_lib_installArtifact.step);
+
+    // JrClasses_tests
+    const JrClasses_tests = b.addTest(.{
+        .root_source_file = b.path("src/JrClasses/JrClasses.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    // JrClasses_tests C source
+    JrClasses_tests.linkLibC();
+    // JrClasses_tests vcpkg library
+    JrClasses_tests.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
+    JrClasses_tests.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+    JrClasses_tests.linkSystemLibrary("glfw3dll");
+    // JrClasses_tests zig library
+    JrClasses_tests.root_module.addImport("zmath", zmath.module("root"));
+
+    const JrClasses_unit_tests = b.addRunArtifact(JrClasses_tests);
+    const test_step = b.step("test", "Run JrClasses unit tests");
+    test_step.dependOn(&JrClasses_unit_tests.step);
 
     // JanRenderer_lib
     const JanRenderer_lib = b.addStaticLibrary(.{
@@ -118,12 +149,14 @@ pub fn build(b: *std.Build) !void {
     JanRenderer_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
     JanRenderer_lib.linkSystemLibrary("glfw3dll");
 
+    JanRenderer_lib.installHeadersDirectory(b.path("vcpkg_installed/x64-windows/include/cglm/"), "cglm", .{});
+
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
     // running `zig build`).
     b.installArtifact(JanRenderer_lib);
 
-    // TestApp
+    // TestApp_exe
     const TestApp_exe = b.addExecutable(.{
         .name = "TestApp",
         // In this case the main source file is merely a path, however, in more
@@ -132,13 +165,16 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    TestApp_exe.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+    // TestApp_exe C source
+    TestApp_exe.linkLibC();
+    TestApp_exe.addIncludePath(b.path("zig-out/include/"));
+    TestApp_exe.addLibraryPath(b.path("zig-out/lib/"));
     TestApp_exe.linkSystemLibrary("glfw3dll");
     TestApp_exe.linkLibrary(JanRenderer_lib);
 
     b.installArtifact(TestApp_exe);
-    const exe_install_artifact = b.addInstallArtifact(TestApp_exe, .{});
-    b.getInstallStep().dependOn(&exe_install_artifact.step);
+    const exe_installArtifact = b.addInstallArtifact(TestApp_exe, .{});
+    b.getInstallStep().dependOn(&exe_installArtifact.step);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
