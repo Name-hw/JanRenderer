@@ -79,8 +79,8 @@ pub fn build(b: *std.Build) !void {
     // zmath
     const zmath = b.dependency("zmath", .{});
 
-    // zflecs
-    const zflecs = b.dependency("zflecs", .{});
+    // coyote-ecs
+    const coyoteEcs = b.dependency("coyote-ecs", .{});
 
     // glfw
     b.installBinFile("vcpkg_installed/x64-windows/bin/glfw3.dll", "glfw3.dll");
