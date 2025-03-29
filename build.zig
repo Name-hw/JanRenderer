@@ -80,7 +80,7 @@ pub fn build(b: *std.Build) !void {
     const zmath = b.dependency("zmath", .{});
 
     // coyote-ecs
-    const coyoteEcs = b.dependency("coyote-ecs", .{});
+    //const coyoteEcs = b.dependency("coyote-ecs", .{});
 
     // glfw
     b.installBinFile("vcpkg_installed/x64-windows/bin/glfw3.dll", "glfw3.dll");
@@ -100,7 +100,7 @@ pub fn build(b: *std.Build) !void {
     JrClasses_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
     // JrClasses_lib zig library
     JrClasses_lib.root_module.addImport("zmath", zmath.module("root"));
-    JrClasses_lib.root_module.addImport("zflecs", zflecs.module("root"));
+    //JrClasses_lib.root_module.addImport("coyoteEcs", coyoteEcs.module(""));
 
     // JrClasses.h (unused)
     // There are many bugs in zig, so use JrClasses.hpp that I created instead of

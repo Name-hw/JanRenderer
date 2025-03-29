@@ -21,4 +21,15 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action,
                  int mods);
 void cursorPositionCallback(GLFWwindow *window, double xpos, double ypos);
 void scrollCallback(GLFWwindow *window, double xoffset, double yoffset);
+
+struct JrShader {
+  VkShaderStageFlagBits stage;
+  VkShaderStageFlags nextStage;
+  VkShaderEXT shaderEXT;
+  VkShaderCreateInfoEXT shaderEXT_createInfo;
+  char *shader_name;
+  uint32_t *spirv;
+};
+void createLinkedShaders(VkDevice device, JrShader *vertShader,
+                         JrShader *fragShader);
 }

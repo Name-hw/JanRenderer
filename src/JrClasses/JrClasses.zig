@@ -10,6 +10,7 @@ const glfw = @cImport({
 });
 
 pub const JrCamera = @import("JrCamera.zig");
+pub const JrShader = @import("JrShader.zig");
 
 // WIP
 pub export fn jrCamera_new() callconv(.C) *JrCamera {
@@ -19,4 +20,9 @@ pub export fn jrCamera_new() callconv(.C) *JrCamera {
     newJrCamera.* = JrCamera{};
 
     return newJrCamera;
+}
+
+pub export fn jrShader_new() callconv(.C) *JrShader.JrShader {
+    var whatIsItsName: JrShader.JrShader = undefined;
+    return &whatIsItsName;
 }
