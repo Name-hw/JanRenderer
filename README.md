@@ -52,7 +52,6 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 ### Vcpkg
 
 - [volk](https://github.com/zeux/volk)
-- [glfw](https://github.com/glfw/glfw)
 - [cglm](https://github.com/recp/cglm)
 - [stb](https://github.com/nothings/stb)
 - [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader)
@@ -60,3 +59,6 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 ### Zig build system
 
 - [zmath](https://github.com/zig-gamedev/zmath)
+- [zglfw](https://github.com/zig-gamedev/zglfw)
+- [zgui](https://github.com/zig-gamedev/zgui)
+- [coyote-ecs](https://github.com/linuxy/coyote-ecs)

@@ -79,12 +79,20 @@ pub fn build(b: *std.Build) !void {
     // zmath
     const zmath = b.dependency("zmath", .{});
 
+    // zglfw
+    const zglfw = b.dependency("zglfw", .{});
+    const zglfw_lib = zglfw.artifact("glfw");
+
+    // zgui
+    const zgui = b.dependency("zgui", .{
+        .backend = .glfw_vulkan,
+        .with_implot = true,
+    });
+    const zgui_lib = zgui.artifact("imgui");
+    zgui_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
+
     // coyote-ecs
     //const coyoteEcs = b.dependency("coyote-ecs", .{});
-
-    // glfw
-    b.installBinFile("vcpkg_installed/x64-windows/bin/glfw3.dll", "glfw3.dll");
-    b.installLibFile("vcpkg_installed/x64-windows/lib/glfw3dll.lib", "glfw3dll.lib");
 
     // JrClasses_lib
     const JrClasses_lib = b.addStaticLibrary(.{
@@ -100,6 +108,8 @@ pub fn build(b: *std.Build) !void {
     JrClasses_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
     // JrClasses_lib zig library
     JrClasses_lib.root_module.addImport("zmath", zmath.module("root"));
+    JrClasses_lib.root_module.addImport("zglfw", zglfw.module("root"));
+    JrClasses_lib.root_module.addImport("zgui", zgui.module("root"));
     //JrClasses_lib.root_module.addImport("coyoteEcs", coyoteEcs.module(""));
 
     // JrClasses.h (unused)
@@ -113,24 +123,24 @@ pub fn build(b: *std.Build) !void {
     //JrClasses_lib_installArtifact.emitted_h = JrClasses_lib_header.;
     b.getInstallStep().dependOn(&JrClasses_lib_installArtifact.step);
 
-    // JrClasses_tests
-    const JrClasses_tests = b.addTest(.{
-        .root_source_file = b.path("src/JrClasses/JrClasses.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    // JrClasses_tests C source
-    JrClasses_tests.linkLibC();
-    // JrClasses_tests vcpkg library
-    JrClasses_tests.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
-    JrClasses_tests.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
-    JrClasses_tests.linkSystemLibrary("glfw3dll");
-    // JrClasses_tests zig library
-    JrClasses_tests.root_module.addImport("zmath", zmath.module("root"));
+    //// JrClasses_tests (unused)
+    //const JrClasses_tests = b.addTest(.{
+    //    .root_source_file = b.path("src/JrClasses/JrClasses.zig"),
+    //    .target = target,
+    //    .optimize = optimize,
+    //});
+    //// JrClasses_tests C source
+    //JrClasses_tests.linkLibC();
+    //// JrClasses_tests vcpkg library
+    //JrClasses_tests.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
+    //JrClasses_tests.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+    //JrClasses_tests.linkSystemLibrary("glfw3dll");
+    //// JrClasses_tests zig library
+    //JrClasses_tests.root_module.addImport("zmath", zmath.module("root"));
 
-    const JrClasses_unit_tests = b.addRunArtifact(JrClasses_tests);
-    const test_step = b.step("test", "Run JrClasses unit tests");
-    test_step.dependOn(&JrClasses_unit_tests.step);
+    //const JrClasses_unit_tests = b.addRunArtifact(JrClasses_tests);
+    //const test_step = b.step("test", "Run JrClasses unit tests");
+    //test_step.dependOn(&JrClasses_unit_tests.step);
 
     // JanRenderer_lib
     const JanRenderer_lib = b.addStaticLibrary(.{
@@ -147,9 +157,11 @@ pub fn build(b: *std.Build) !void {
     // JanRenderer_lib vcpkg library
     JanRenderer_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
     JanRenderer_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
-    JanRenderer_lib.linkSystemLibrary("glfw3dll");
-
+    // JrClasses_lib zig library
     JanRenderer_lib.installHeadersDirectory(b.path("vcpkg_installed/x64-windows/include/cglm/"), "cglm", .{});
+    JanRenderer_lib.linkLibrary(zglfw_lib);
+    JanRenderer_lib.addIncludePath(zgui.path("libs/imgui"));
+    JanRenderer_lib.linkLibrary(zgui_lib);
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
@@ -167,9 +179,9 @@ pub fn build(b: *std.Build) !void {
     });
     // TestApp_exe C source
     TestApp_exe.linkLibC();
+    TestApp_exe.linkLibCpp();
     TestApp_exe.addIncludePath(b.path("zig-out/include/"));
     TestApp_exe.addLibraryPath(b.path("zig-out/lib/"));
-    TestApp_exe.linkSystemLibrary("glfw3dll");
     TestApp_exe.linkLibrary(JanRenderer_lib);
 
     b.installArtifact(TestApp_exe);

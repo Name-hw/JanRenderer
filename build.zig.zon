@@ -28,6 +28,14 @@
             .url = "git+https://github.com/zig-gamedev/zmath.git#ccf7297ef6c01e21b2d51ad81b5b6ce929e86a00",
             .hash = "zmath-0.11.0-dev-wjwivZY1AwDO7yxNmZ5HWoU03f9mFBet8LN9-oYc3i29",
         },
+        .zglfw = .{
+            .url = "git+https://github.com/zig-gamedev/zglfw.git#75ab44d1bff1c16585ceeacf2db5d7909afefa83",
+            .hash = "zglfw-0.10.0-dev-zgVDNN6bIQDOl1vEb15vC3PJ1Nrg8cP1m3DFJlDOzhgd",
+        },
+        .zgui = .{
+            .url = "git+https://github.com/zig-gamedev/zgui.git#c2032936101c187c04d94f51dd954b88591ed31a",
+            .hash = "zgui-0.6.0-dev--L6sZMGHaACFOZGRyaYIAlsCxHXvaYhKGll4GjitZA-H",
+        },
         .@"coyote-ecs" = .{
             .url = "git+https://github.com/linuxy/coyote-ecs.git#2b622408880ae865493240a440ae42a2a76828d4",
             .hash = "N-V-__8AAAf3AACq736mNk-jEwxUCrHYfB6ZiRRMNzOVtrom",

@@ -5,11 +5,7 @@ const cglm = @cImport({
     @cInclude("cglm/struct.h");
 });
 const FixedCglm = @import("lib/FixedCglm.zig");
-const glfw = @cImport({
-    @cDefine("VK_USE_PLATFORM_WIN32_KHR", "");
-    @cDefine("GLFW_INCLUDE_VULKAN", "");
-    @cInclude("GLFW/glfw3.h");
-});
+const zglfw = @import("zglfw");
 const zmath = @import("zmath");
 
 var self: *JrCamera = undefined;
@@ -55,34 +51,34 @@ pub export fn getViewMatrix() callconv(.C) cglm.mat4s {
     return cglm.glms_mat4_make(&r);
 }
 
-pub export fn keyCallback(window: ?*glfw.GLFWwindow, key: c_int, scancode: c_int, action: c_int, mods: c_int) callconv(.C) void {
+pub export fn keyCallback(window: *zglfw.Window, key: zglfw.Key, scancode: c_int, action: zglfw.Action, mods: zglfw.Mods) callconv(.C) void {
     _ = window;
     _ = scancode;
     _ = mods;
-    if (action == glfw.GLFW_PRESS) {
-        if (key == glfw.GLFW_KEY_W) {
+    if (action == zglfw.Action.press) {
+        if (key == zglfw.Key.w) {
             self.velocity.unnamed_0.z += self.speed * -1;
         }
-        if (key == glfw.GLFW_KEY_S) {
+        if (key == zglfw.Key.s) {
             self.velocity.unnamed_0.z += self.speed * 1;
         }
-        if (key == glfw.GLFW_KEY_A) {
+        if (key == zglfw.Key.a) {
             self.velocity.unnamed_0.x += self.speed * -1;
         }
-        if (key == glfw.GLFW_KEY_D) {
+        if (key == zglfw.Key.d) {
             self.velocity.unnamed_0.x += self.speed * 1;
         }
-    } else if (action == glfw.GLFW_RELEASE) {
-        if (key == glfw.GLFW_KEY_W) {
+    } else if (action == zglfw.Action.release) {
+        if (key == zglfw.Key.w) {
             self.velocity.unnamed_0.z -= self.speed * -1;
         }
-        if (key == glfw.GLFW_KEY_S) {
+        if (key == zglfw.Key.s) {
             self.velocity.unnamed_0.z -= self.speed * 1;
         }
-        if (key == glfw.GLFW_KEY_A) {
+        if (key == zglfw.Key.a) {
             self.velocity.unnamed_0.x -= self.speed * -1;
         }
-        if (key == glfw.GLFW_KEY_D) {
+        if (key == zglfw.Key.d) {
             self.velocity.unnamed_0.x -= self.speed * 1;
         }
     }
@@ -94,7 +90,7 @@ pub export fn keyCallback(window: ?*glfw.GLFWwindow, key: c_int, scancode: c_int
 //    try testing.expect(self.velocity.unnamed_0.z == 1);
 //}
 
-pub export fn cursorPositionCallback(window: ?*glfw.GLFWwindow, xpos: f64, ypos: f64) callconv(.C) void {
+pub export fn cursorPositionCallback(window: *zglfw.Window, xpos: f64, ypos: f64) callconv(.C) void {
     _ = window;
 
     const static = struct {
@@ -123,7 +119,7 @@ pub export fn cursorPositionCallback(window: ?*glfw.GLFWwindow, xpos: f64, ypos:
     if (self.pitch < -89) self.pitch = -89;
 }
 
-pub export fn scrollCallback(window: ?*glfw.GLFWwindow, xoffset: f64, yoffset: f64) callconv(.C) void {
+pub export fn scrollCallback(window: *zglfw.Window, xoffset: f64, yoffset: f64) callconv(.C) void {
     _ = window;
     _ = xoffset;
 
