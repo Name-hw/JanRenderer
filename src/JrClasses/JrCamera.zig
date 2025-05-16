@@ -5,8 +5,8 @@ const cglm = @cImport({
     @cInclude("cglm/struct.h");
 });
 const FixedCglm = @import("lib/FixedCglm.zig");
-const zglfw = @import("zglfw");
 const zmath = @import("zmath");
+const zglfw = @import("zglfw");
 
 var self: *JrCamera = undefined;
 

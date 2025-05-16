@@ -155,6 +155,7 @@ private:
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
   VkDevice device;
 
+  // queue
   QueueFamily queueFamily;
   VkQueue graphicsQueue;
   VkQueue presentQueue;
@@ -182,6 +183,9 @@ private:
   VkCommandPool computeCommandPool;
   std::vector<VkCommandBuffer> commandBuffers;
   std::vector<VkCommandBuffer> computeCommandBuffers;
+  VkCommandBuffer guiCommandBuffer;
+  // secondary command buffers
+  // ...
 
   std::vector<VkSemaphore> imageAvailableSemaphores;
   std::vector<VkSemaphore> renderFinishedSemaphores;
@@ -203,6 +207,7 @@ private:
   std::vector<VkDeviceMemory> uniformBuffersMemory;
   std::vector<void *> uniformBuffersMapped;
 
+  // descriptor pools
   VkDescriptorPool descriptorPool;
   std::vector<VkDescriptorSet> descriptorSets;
 
@@ -228,18 +233,18 @@ private:
   std::vector<VkBuffer> shaderStorageBuffers;
   std::vector<VkDeviceMemory> shaderStorageBuffersMemory;
 
-  HMODULE JrClasses_lib;
   JrCamera *camera;
+  JrGui *gui;
 
   // helper functions
   void populateDebugMessengerCreateInfo(
       VkDebugUtilsMessengerCreateInfoEXT &createInfo);
-  // populateDebugMessengerCreateInfo debugCallback
+  // populateDebugMessengerCreateInfo vkDebugCallback
   static VKAPI_ATTR VkBool32 VKAPI_CALL
-  debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                VkDebugUtilsMessageTypeFlagsEXT messageType,
-                const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-                void *pUserData) {
+  vkDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                  VkDebugUtilsMessageTypeFlagsEXT messageType,
+                  const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+                  void *pUserData) {
 
     if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
       std::cerr << "\033[1;33m" << "[WARNING] " << "\033[0m";
@@ -353,6 +358,9 @@ private:
   void createComputeCommandBuffers();
 
   void createSyncObjects();
+
+  // initGui
+  void initGui();
 
   // mainLoop
   void mainLoop();
