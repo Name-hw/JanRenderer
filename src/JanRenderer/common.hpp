@@ -16,11 +16,10 @@
 #define CGLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <cglm/struct.h>
 
-// JrClasses
-// There are many bugs in zig, so use JrClasses.hpp that I created instead of
-// this automatically generated header file.
-// #include <JrClasses.h>
-#include "JrClasses.hpp"
+// imgui
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_vulkan.h>
+#include <imgui.h>
 
 // std
 #include <algorithm>
@@ -38,3 +37,9 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
+
+// JrClasses
+// There are many bugs in zig, so use JrClasses.hpp that I created instead of
+// this automatically generated header file.
+// #include <JrClasses.h>
+#include "JrClasses.hpp"

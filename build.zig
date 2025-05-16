@@ -8,19 +8,35 @@ const CSourceFiles: []const []const u8 =
     &.{"src/JanRenderer/JanRenderer.cpp"};
 const CFlags: []const []const u8 = &.{"-std=c++17"};
 
-fn findCSourceFiles(b: *std.Build, absoluteDir: std.fs.Dir) ![]const []const u8 {
+fn absolutePathToRelative(b: *std.Build, path: []const u8) ![]u8 {
+    return try mem.replaceOwned(u8, b.allocator, path, "\\", "/");
+}
+
+fn findCSourceFiles(b: *std.Build, absoluteDir: std.fs.Dir, fileNames: ?[]const []const u8) ![]const []const u8 {
     var dir_walker = try absoluteDir.walk(b.allocator);
     defer dir_walker.deinit();
 
     var src_files_arrayList = std.ArrayList([]const u8).init(b.allocator);
-    while (try dir_walker.next()) |entry| {
-        if (entry.kind == .file and mem.endsWith(u8, entry.basename, "c") and mem.endsWith(u8, entry.basename, "h")) {
-            const path =
-                try std.mem.replaceOwned(u8, b.allocator, entry.path, "\\", "/");
-            try src_files_arrayList.append(path);
+
+    if (fileNames) |fileNames_| {
+        while (try dir_walker.next()) |entry| {
+            for (fileNames_) |fileName| {
+                if (mem.eql(u8, entry.basename, fileName)) {
+                    const path = try absolutePathToRelative(b, entry.path);
+
+                    try src_files_arrayList.append(path);
+                }
+            }
+        }
+    } else {
+        while (try dir_walker.next()) |entry| {
+            if (entry.kind == .file and mem.endsWith(u8, entry.basename, "c") and mem.endsWith(u8, entry.basename, "h")) {
+                const path = try absolutePathToRelative(b, entry.path);
+
+                try src_files_arrayList.append(path);
+            }
         }
     }
-
     return src_files_arrayList.items;
 }
 
@@ -58,6 +74,43 @@ fn addPkg_C(b: *std.Build, pkg_name: []const u8, target: std.Build.ResolvedTarge
     return pkg_lib;
 }
 
+//fn addImgui(b: *std.Build, artifact: *std.Build.Step.Compile, zgui: *std.Build.Dependency) !void {
+//    const cwd = fs.cwd();
+//    const zgui_cflags = &.{
+//        //"-fno-sanitize=undefined",
+//        //"-Wno-elaborated-enum-base",
+//        //"-Wno-error=date-time",
+//        //if (options.use_32bit_draw_idx) "-DIMGUI_USE_32BIT_DRAW_INDEX" else "",
+//    };
+//    var zgui_absoluteDir = try cwd.openDir(zgui.path("").getPath(b), .{ .iterate = true });
+//    defer zgui_absoluteDir.close();
+
+//    artifact.addIncludePath(b.path("zig-out/include/imgui"));
+//    artifact.addCSourceFiles(.{
+//        .files = try findCSourceFiles(b, zgui_absoluteDir, &.{
+//            "libs/imgui/imgui.cpp",
+//            "libs/imgui/imgui_widgets.cpp",
+//            "libs/imgui/imgui_tables.cpp",
+//            "libs/imgui/imgui_draw.cpp",
+//            "libs/imgui/imgui_demo.cpp",
+//        }),
+//        .flags = zgui_cflags,
+//    });
+//    artifact.addCSourceFiles(.{
+//        .files = try findCSourceFiles(b, zgui_absoluteDir, &.{
+//            "libs/imgui/backends/imgui_impl_glfw.cpp",
+//            "libs/imgui/backends/imgui_impl_vulkan.cpp",
+//        }),
+//        .flags = zgui_cflags,
+//    });
+//    //for (try findCSourceFiles(b, zgui_absoluteDir, &.{
+//    //    "libs/imgui/backends/imgui_impl_glfw.cpp",
+//    //    "libs/imgui/backends/imgui_impl_vulkan.cpp",
+//    //})) |x| {
+//    //    std.log.debug("{s}", x);
+//    //}
+//}
+
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
@@ -81,15 +134,17 @@ pub fn build(b: *std.Build) !void {
 
     // zglfw
     const zglfw = b.dependency("zglfw", .{});
+    const zglfw_module = zglfw.module("root");
     const zglfw_lib = zglfw.artifact("glfw");
 
     // zgui
     const zgui = b.dependency("zgui", .{
         .backend = .glfw_vulkan,
-        .with_implot = true,
     });
+    const zgui_module = zgui.module("root");
     const zgui_lib = zgui.artifact("imgui");
-    zgui_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
+    zgui_lib.root_module.addCMacro("IMGUI_IMPL_VULKAN_USE_VOLK", "");
+    zgui_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/")); // to include vulkan
 
     // coyote-ecs
     //const coyoteEcs = b.dependency("coyote-ecs", .{});
@@ -108,8 +163,9 @@ pub fn build(b: *std.Build) !void {
     JrClasses_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
     // JrClasses_lib zig library
     JrClasses_lib.root_module.addImport("zmath", zmath.module("root"));
-    JrClasses_lib.root_module.addImport("zglfw", zglfw.module("root"));
-    JrClasses_lib.root_module.addImport("zgui", zgui.module("root"));
+    JrClasses_lib.root_module.addImport("zglfw", zglfw_module);
+    JrClasses_lib.root_module.addImport("zgui", zgui_module);
+    JrClasses_lib.linkLibrary(zgui_lib);
     //JrClasses_lib.root_module.addImport("coyoteEcs", coyoteEcs.module(""));
 
     // JrClasses.h (unused)
@@ -157,11 +213,11 @@ pub fn build(b: *std.Build) !void {
     // JanRenderer_lib vcpkg library
     JanRenderer_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
     JanRenderer_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
-    // JrClasses_lib zig library
-    JanRenderer_lib.installHeadersDirectory(b.path("vcpkg_installed/x64-windows/include/cglm/"), "cglm", .{});
+    // JanRenderer_lib zig library
+    JanRenderer_lib.addIncludePath(b.path("zig-out/include/"));
+    JanRenderer_lib.addLibraryPath(b.path("zig-out/bin/"));
     JanRenderer_lib.linkLibrary(zglfw_lib);
     JanRenderer_lib.addIncludePath(zgui.path("libs/imgui"));
-    JanRenderer_lib.linkLibrary(zgui_lib);
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
@@ -180,8 +236,9 @@ pub fn build(b: *std.Build) !void {
     // TestApp_exe C source
     TestApp_exe.linkLibC();
     TestApp_exe.linkLibCpp();
+    // TestApp_exe zig library
     TestApp_exe.addIncludePath(b.path("zig-out/include/"));
-    TestApp_exe.addLibraryPath(b.path("zig-out/lib/"));
+    TestApp_exe.addLibraryPath(b.path("zig-out/bin/"));
     TestApp_exe.linkLibrary(JanRenderer_lib);
 
     b.installArtifact(TestApp_exe);

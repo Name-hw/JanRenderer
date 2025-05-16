@@ -66,6 +66,7 @@ void JanRenderer::run() {
   initWindow();
   initJrClasses();
   initVulkan();
+  initGui();
   mainLoop();
   cleanup();
 }
@@ -83,7 +84,7 @@ void JanRenderer::populateDebugMessengerCreateInfo(
   createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-  createInfo.pfnUserCallback = debugCallback;
+  createInfo.pfnUserCallback = vkDebugCallback;
 }
 
 QueueFamily JanRenderer::getQueueFamily(VkPhysicalDevice physicalDevice_) {
@@ -468,21 +469,6 @@ void JanRenderer::framebufferResizeCallback(GLFWwindow *window, int width,
 
 // initJrClasses
 void JanRenderer::initJrClasses() {
-  /*
-  JrClasses_lib = LoadLibrary("JrClasses.dll");
-
-  // JrCamera
-  JrCamera_new jrCamera_new =
-      (JrCamera_new)GetProcAddress(JrClasses_lib, "jrCamera_new");
-  camera = jrCamera_new();
-
-  JrCamera_update jrCamera_update =
-      (JrCamera_new)GetProcAddress(JrClasses_lib, "jrCamera_update");
-  camera = jrCamera_new();
-
-  jrCamera_update(camera);
-  FreeLibrary(JrClasses_lib);
-  */
   camera = new JrCamera;
   init(camera);
 
@@ -954,7 +940,7 @@ void JanRenderer::createRenderPass() {
   colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
   colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+  colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
   VkAttachmentReference colorAttachmentResolveRef{};
   colorAttachmentResolveRef.attachment = 2;
@@ -2015,10 +2001,35 @@ void JanRenderer::createSyncObjects() {
   }
 }
 
+// initGui
+void JanRenderer::initGui() {
+  ImGui_ImplVulkan_InitInfo initInfo{};
+  initInfo.Instance = instance;
+  initInfo.PhysicalDevice = physicalDevice;
+  initInfo.MinImageCount = 3;
+  initInfo.ImageCount = 3;
+  initInfo.MinAllocationSize = 1024 * 1024;
+
+  gui = new JrGui;
+  gui->device = device;
+  gui->queueFamilyIndex = queueFamily.graphicsFamily.value();
+  gui->queue = graphicsQueue;
+  gui->swapChainImageFormat = swapChainImageFormat;
+  gui->swapChainExtent = swapChainExtent;
+  gui->swapChainImageViews = swapChainImageViews.data();
+  gui->msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+  gui->window = window;
+  gui->initInfo = initInfo;
+  gui->args = nullptr;
+
+  jrGui_init(gui);
+};
+
 // mainLoop
 void JanRenderer::mainLoop() {
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+    jrGui_newFrame(gui, width, height, currentFrame);
     drawFrame();
   }
 
@@ -2093,18 +2104,19 @@ void JanRenderer::drawFrame() {
   graphicsSubmitInfo.signalSemaphoreCount = 1;
   graphicsSubmitInfo.pSignalSemaphores = signalSemaphores;
 
-  if (vkQueueSubmit(graphicsQueue, 1, &graphicsSubmitInfo,
-                    inFlightFences[currentFrame]) != VK_SUCCESS) {
+  if (vkQueueSubmit(graphicsQueue, 1, &graphicsSubmitInfo, nullptr) !=
+      VK_SUCCESS) {
     throw std::runtime_error("failed to submit draw command buffer!");
   }
+
+  jrGui_render(gui, imageIndex, 1, signalSemaphores,
+               inFlightFences[currentFrame]);
 
   VkSwapchainKHR swapChains[] = {swapChain};
   VkPresentInfoKHR presentInfo{};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
   presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores = signalSemaphores;
-
+  presentInfo.pWaitSemaphores = gui->renderFinishedSemaphores;
   presentInfo.swapchainCount = 1;
   presentInfo.pSwapchains = swapChains;
   presentInfo.pImageIndices = &imageIndex;
@@ -2273,6 +2285,8 @@ void JanRenderer::recreateSwapChain() {
 // cleanup
 void JanRenderer::cleanup() {
   free(applicationName);
+
+  jrGui_destroy(gui);
 
   cleanupSwapChain();
 
