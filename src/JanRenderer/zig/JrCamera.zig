@@ -4,7 +4,7 @@ const cglm = @cImport({
     @cDefine("CGLM_FORCE_DEPTH_ZERO_TO_ONE", "");
     @cInclude("cglm/struct.h");
 });
-const FixedCglm = @import("lib/FixedCglm.zig");
+const FixedCglm = @import("utils/FixedCglm.zig");
 const glfw = @cImport({
     @cDefine("VK_USE_PLATFORM_WIN32_KHR", "");
     @cDefine("GLFW_INCLUDE_VULKAN", "");

@@ -89,7 +89,7 @@ pub fn build(b: *std.Build) !void {
     // JrClasses_lib
     const JrClasses_lib = b.addStaticLibrary(.{
         .name = "JrClasses",
-        .root_source_file = b.path("src/JrClasses/JrClasses.zig"),
+        .root_source_file = b.path("src/JanRenderer/zig/JrApi.zig"),
         .target = target,
         .optimize = optimize,
     });
