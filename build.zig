@@ -95,6 +95,7 @@ pub fn build(b: *std.Build) !void {
     });
     // JrClasses_lib C source
     JrClasses_lib.linkLibC();
+    JrClasses_lib.addIncludePath(b.path("include/"));
     // JrClasses_lib vcpkg library
     JrClasses_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
     JrClasses_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));

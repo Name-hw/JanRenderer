@@ -18,7 +18,7 @@ pub const JrShader = extern struct {
 
 // member functions
 pub export fn jrShader_init(
-    self_: *JrShader,
+    self: *JrShader,
     stage_: volk.VkShaderStageFlagBits,
     nextStage_: volk.VkShaderStageFlags,
     shader_name_: [*c]const u8,
@@ -26,8 +26,6 @@ pub export fn jrShader_init(
     pSetLayouts: *const volk.VkDescriptorSetLayout,
     pPushConstantRange: *const volk.VkPushConstantRange,
 ) callconv(.C) void {
-    var self = self_;
-
     self.stage = stage_;
     self.nextStage = nextStage_;
     self.shader_name = shader_name_;
