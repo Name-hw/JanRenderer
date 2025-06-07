@@ -234,7 +234,7 @@ private:
   std::vector<VkBuffer> shaderStorageBuffers;
   std::vector<VkDeviceMemory> shaderStorageBuffersMemory;
 
-  HMODULE JrClasses_lib;
+  // HMODULE JrClasses_lib; dynamic loading of JrClasses library (old way)
   JrCamera *camera;
 
   // helper functions
@@ -293,8 +293,8 @@ private:
   // initVolk
   void initVolk();
 
-  // initJrClasses
-  void initJrClasses();
+  // initJrObjects
+  void initJrObjects();
 
   // initWindow
   void initWindow();

@@ -16,11 +16,11 @@
 #define CGLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <cglm/struct.h>
 
-// JrClasses
-// There are many bugs in zig, so use JrClasses.hpp that I created instead of
+// JrObjects
+// There are many bugs in zig, so use JrObjects.hpp that I created instead of
 // this automatically generated header file.
-// #include <JrClasses.h>
-#include "JrClasses.hpp"
+// #include <JrObjects.h>
+#include "JrObjects.hpp"
 
 // std
 #include <algorithm>

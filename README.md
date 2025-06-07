@@ -44,7 +44,7 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 
 1. Variables: camelCase
 2. Functions: camelCase
-3. Types (including classes, structs, enums, typedefs, etc): PascalCase
+3. Types (including objects, structs, enums, typedefs, etc): PascalCase
 4. Enums: PascalCase
 
 ## **Dependencies**

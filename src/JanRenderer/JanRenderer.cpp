@@ -63,7 +63,7 @@ JanRenderer::~JanRenderer() {};
 
 void JanRenderer::run() {
   initVolk();
-  initJrClasses();
+  initJrObjects();
   initWindow();
   initVulkan();
   mainLoop();
@@ -443,9 +443,9 @@ void JanRenderer::initVolk() {
   }
 }
 
-// initJrClasses
-void JanRenderer::initJrClasses() {
-  /*
+// initJrObjects
+void JanRenderer::initJrObjects() {
+  /* (old way, using JrClasses.dll)
   JrClasses_lib = LoadLibrary("JrClasses.dll");
 
   // JrCamera
