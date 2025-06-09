@@ -31,5 +31,8 @@ jobs:
         with:
           version: 0.14.1
 
-      - name: Build
-        run: zig build
+      - name: Build Library
+        run: zig build lib
+
+      - name: Build Executable
+        run: zig build exe

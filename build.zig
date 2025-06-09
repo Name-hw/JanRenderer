@@ -3,6 +3,7 @@ const std = @import("std");
 const fs = std.fs;
 const fmt = std.fmt;
 const mem = std.mem;
+const ArrayList = std.ArrayList;
 
 const CSourceFiles: []const []const u8 =
     &.{"src/JanRenderer/JanRenderer.cpp"};
@@ -80,7 +81,7 @@ fn removeFileExtension(fileName: []const u8) ![]const u8 {
     return fileName[0..dotIndex];
 }
 
-fn buildJrObjects(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !void {
+fn buildJrObjects(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, step: *std.Build.Step) !ArrayList(*std.Build.Step.Compile) {
     // library
     const zmath = b.dependency("zmath", .{});
 
@@ -98,11 +99,13 @@ fn buildJrObjects(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
         return err;
     };
 
-    for (JrObject_fileNames) |object_fileName| {
-        const JrObject_path = src_JrObjects_path.path(b, object_fileName);
+    var JrObject_libs = std.ArrayList(*std.Build.Step.Compile).init(b.allocator);
+
+    for (JrObject_fileNames) |JrObject_fileName| {
+        const JrObject_path = src_JrObjects_path.path(b, JrObject_fileName);
 
         const JrObject_lib = b.addStaticLibrary(.{
-            .name = try removeFileExtension(object_fileName),
+            .name = try removeFileExtension(JrObject_fileName),
             .root_source_file = JrObject_path,
             .target = target,
             .optimize = optimize,
@@ -122,27 +125,19 @@ fn buildJrObjects(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
         //const JrObject_lib_header = JrObject_lib.getEmittedH();
         //JrObject_lib.installHeader(JrObject_lib_header, "");
 
-        b.installArtifact(JrObject_lib);
         const JrObject_lib_installArtifact = b.addInstallArtifact(JrObject_lib, .{});
         //JrObject_lib_installArtifact.emitted_h = JrObject_lib_header.;
-        b.getInstallStep().dependOn(&JrObject_lib_installArtifact.step);
+        step.dependOn(&JrObject_lib_installArtifact.step);
+
+        try JrObject_libs.append(JrObject_lib);
     }
+
+    return JrObject_libs;
 }
 
-fn linkJrObjects(b: *std.Build, lib: *std.Build.Step.Compile) !void {
-    const cwd = fs.cwd();
-
-    const zigOut_lib_path = b.path("zig-out/lib/");
-    var zigOut_lib_dir = try cwd.openDir(zigOut_lib_path.getPath(b), .{ .iterate = true });
-    defer zigOut_lib_dir.close();
-
-    lib.addLibraryPath(zigOut_lib_path);
-
-    // zig-out/lib/Jr*
-    const JrObject_fileNames = try findJrObjects(b, zigOut_lib_dir);
-
-    for (JrObject_fileNames) |JrObject_fileName| {
-        lib.linkSystemLibrary(try removeFileExtension(JrObject_fileName));
+pub fn linkJrObjects(lib: *std.Build.Step.Compile, JrObject_libs: ArrayList(*std.Build.Step.Compile)) !void {
+    for (JrObject_libs.items) |JrObject_lib| {
+        lib.linkLibrary(JrObject_lib);
     }
 }
 
@@ -165,10 +160,17 @@ pub fn build(b: *std.Build) !void {
     //const optimize_pkg = .ReleaseFast;
 
     // glfw
-    b.installBinFile("vcpkg_installed/x64-windows/bin/glfw3.dll", "glfw3.dll");
-    b.installLibFile("vcpkg_installed/x64-windows/lib/glfw3dll.lib", "glfw3dll.lib");
+    const glfw_installFiles = [2]*std.Build.Step.InstallFile{
+        b.addInstallBinFile(b.path("vcpkg_installed/x64-windows/bin/glfw3.dll"), "glfw3.dll"),
+        b.addInstallLibFile(b.path("vcpkg_installed/x64-windows/lib/glfw3dll.lib"), "glfw3dll.lib"),
+    };
 
-    buildJrObjects(b, target, optimize) catch |err| {
+    // JanRenderer.lib step
+    const lib_step = b.step("lib", "Run the library build step");
+    lib_step.dependOn(&glfw_installFiles[0].step);
+    lib_step.dependOn(&glfw_installFiles[1].step);
+
+    const JrObject_libs = buildJrObjects(b, target, optimize, lib_step) catch |err| {
         std.debug.print("Failed to build JrObjects! ({})\n", .{err});
         return err;
     };
@@ -210,15 +212,14 @@ pub fn build(b: *std.Build) !void {
 
     JanRenderer_lib.installHeadersDirectory(b.path("vcpkg_installed/x64-windows/include/cglm/"), "cglm", .{});
 
-    linkJrObjects(b, JanRenderer_lib) catch |err| {
-        std.debug.print("Failed to link JrObjects! ({})\n", .{err});
+    linkJrObjects(JanRenderer_lib, JrObject_libs) catch |err| {
+        std.debug.print("Failed to link JrObjects with JanRenderer! ({})\n", .{err});
         return err;
     };
 
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step (the default step when
-    // running `zig build`).
-    b.installArtifact(JanRenderer_lib);
+    const lib_installArtifact = b.addInstallArtifact(JanRenderer_lib, .{});
+
+    lib_step.dependOn(&lib_installArtifact.step);
 
     // TestApp_exe
     const TestApp_exe = b.addExecutable(.{
@@ -233,12 +234,17 @@ pub fn build(b: *std.Build) !void {
     TestApp_exe.linkLibC();
     TestApp_exe.addIncludePath(b.path("zig-out/include/"));
     TestApp_exe.addLibraryPath(b.path("zig-out/lib/"));
-    TestApp_exe.linkSystemLibrary("glfw3dll");
     TestApp_exe.linkLibrary(JanRenderer_lib);
 
-    b.installArtifact(TestApp_exe);
     const exe_installArtifact = b.addInstallArtifact(TestApp_exe, .{});
-    b.getInstallStep().dependOn(&exe_installArtifact.step);
+
+    const exe_step = b.step("exe", "Run the executable build step");
+    exe_step.dependOn(&glfw_installFiles[0].step);
+    exe_step.dependOn(&glfw_installFiles[1].step);
+    exe_step.dependOn(&exe_installArtifact.step);
+
+    b.getInstallStep().dependOn(lib_step);
+    b.getInstallStep().dependOn(exe_step);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
@@ -250,7 +256,11 @@ pub fn build(b: *std.Build) !void {
     // directory. This is not necessary, however, if the application depends on
     // other installed files, this ensures they will be present and in the
     // expected location.
-    run_cmd.step.dependOn(b.getInstallStep());
+    run_cmd.step.dependOn(lib_step);
+    run_cmd.step.dependOn(exe_step);
+
+    // The run command is executed inside zig-out/bin/
+    run_cmd.setCwd(b.path("zig-out/bin/"));
 
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`
