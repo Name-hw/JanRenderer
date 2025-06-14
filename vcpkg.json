@@ -1,7 +1,6 @@
 {
   "dependencies": [
     "volk",
-    "glfw3",
     "cglm",
     "stb",
     "tinyobjloader"

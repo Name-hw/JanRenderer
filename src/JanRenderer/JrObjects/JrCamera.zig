@@ -5,12 +5,8 @@ const cglm = @cImport({
     @cInclude("cglm/struct.h");
 });
 const FixedCglm = @import("utils/FixedCglm.zig");
-const glfw = @cImport({
-    @cDefine("VK_USE_PLATFORM_WIN32_KHR", "");
-    @cDefine("GLFW_INCLUDE_VULKAN", "");
-    @cInclude("GLFW/glfw3.h");
-});
 const zmath = @import("zmath");
+const zglfw = @import("zglfw");
 const common = @import("common.zig");
 
 pub const JrCamera = extern struct {
@@ -52,35 +48,35 @@ pub export fn jrCamera_getViewMatrix(self: *JrCamera) callconv(.C) cglm.mat4s {
     return cglm.glms_mat4_make(&r);
 }
 
-pub export fn jrCamera_keyCallback(window: ?*glfw.GLFWwindow, key: c_int, scancode: c_int, action: c_int, mods: c_int) callconv(.C) void {
+pub export fn jrCamera_keyCallback(window: *zglfw.Window, key: zglfw.Key, scancode: c_int, action: zglfw.Action, mods: zglfw.Mods) callconv(.C) void {
     _ = scancode;
     _ = mods;
-    const self = @as(*common.GlfwUserPointer, @ptrCast(@alignCast(glfw.glfwGetWindowUserPointer(window)))).camera orelse @panic("Problem with key callback");
+    const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with key callback");
 
-    if (action == glfw.GLFW_PRESS) {
-        if (key == glfw.GLFW_KEY_W) {
+    if (action == zglfw.Action.press) {
+        if (key == zglfw.Key.w) {
             self.velocity.unnamed_0.z += self.speed * -1;
         }
-        if (key == glfw.GLFW_KEY_S) {
+        if (key == zglfw.Key.s) {
             self.velocity.unnamed_0.z += self.speed * 1;
         }
-        if (key == glfw.GLFW_KEY_A) {
+        if (key == zglfw.Key.a) {
             self.velocity.unnamed_0.x += self.speed * -1;
         }
-        if (key == glfw.GLFW_KEY_D) {
+        if (key == zglfw.Key.d) {
             self.velocity.unnamed_0.x += self.speed * 1;
         }
-    } else if (action == glfw.GLFW_RELEASE) {
-        if (key == glfw.GLFW_KEY_W) {
+    } else if (action == zglfw.Action.release) {
+        if (key == zglfw.Key.w) {
             self.velocity.unnamed_0.z -= self.speed * -1;
         }
-        if (key == glfw.GLFW_KEY_S) {
+        if (key == zglfw.Key.s) {
             self.velocity.unnamed_0.z -= self.speed * 1;
         }
-        if (key == glfw.GLFW_KEY_A) {
+        if (key == zglfw.Key.a) {
             self.velocity.unnamed_0.x -= self.speed * -1;
         }
-        if (key == glfw.GLFW_KEY_D) {
+        if (key == zglfw.Key.d) {
             self.velocity.unnamed_0.x -= self.speed * 1;
         }
     }
@@ -92,8 +88,9 @@ pub export fn jrCamera_keyCallback(window: ?*glfw.GLFWwindow, key: c_int, scanco
 //    try testing.expect(self.velocity.unnamed_0.z == 1);
 //}
 
-pub export fn jrCamera_cursorPositionCallback(window: ?*glfw.GLFWwindow, xpos: f64, ypos: f64) callconv(.C) void {
-    const self = @as(*common.GlfwUserPointer, @ptrCast(@alignCast(glfw.glfwGetWindowUserPointer(window)))).camera orelse @panic("Problem with cursor position callback");
+pub export fn jrCamera_cursorPositionCallback(window: *zglfw.Window, xpos: f64, ypos: f64) callconv(.C) void {
+    const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with cursor position callback");
+
     const static = struct {
         var firstMouse: bool = true;
         var lastXpos: f64 = 0;
@@ -120,9 +117,9 @@ pub export fn jrCamera_cursorPositionCallback(window: ?*glfw.GLFWwindow, xpos: f
     if (self.pitch < -89) self.pitch = -89;
 }
 
-pub export fn jrCamera_scrollCallback(window: ?*glfw.GLFWwindow, xoffset: f64, yoffset: f64) callconv(.C) void {
+pub export fn jrCamera_scrollCallback(window: *zglfw.Window, xoffset: f64, yoffset: f64) callconv(.C) void {
     _ = xoffset;
-    const self = @as(*common.GlfwUserPointer, @ptrCast(@alignCast(glfw.glfwGetWindowUserPointer(window)))).camera orelse @panic("Problem with scroll callback");
+    const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with scroll callback");
     self.fov -= @floatCast(yoffset);
 
     if (self.pitch < 1) self.pitch = 1;
