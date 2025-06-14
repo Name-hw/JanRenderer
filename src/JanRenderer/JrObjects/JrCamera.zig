@@ -4,11 +4,10 @@ const cglm = @cImport({
     @cDefine("CGLM_FORCE_DEPTH_ZERO_TO_ONE", "");
     @cInclude("cglm/struct.h");
 });
-const FixedCglm = @import("lib/FixedCglm.zig");
+const FixedCglm = @import("utils/FixedCglm.zig");
 const zmath = @import("zmath");
 const zglfw = @import("zglfw");
-
-var self: *JrCamera = undefined;
+const common = @import("common.zig");
 
 pub const JrCamera = extern struct {
     position: cglm.vec3s,
@@ -21,9 +20,7 @@ pub const JrCamera = extern struct {
     fov: f32,
 };
 
-pub export fn init(self_: *JrCamera) callconv(.C) void {
-    self = self_;
-
+pub export fn jrCamera_init(self: *JrCamera) callconv(.C) void {
     self.position = cglm.glms_vec3_zero();
     self.velocity = cglm.glms_vec3_zero();
 
@@ -33,7 +30,7 @@ pub export fn init(self_: *JrCamera) callconv(.C) void {
     self.fov = 45;
 }
 
-pub export fn getRotationMatrix() callconv(.C) cglm.mat4s {
+pub export fn jrCamera_getRotationMatrix(self: *JrCamera) callconv(.C) cglm.mat4s {
     const pitchRotation: zmath.Quat = zmath.quatFromNormAxisAngle(zmath.Vec{ 1, 0, 0, 0 }, self.pitch);
     const yawRotation: zmath.Quat = zmath.quatFromNormAxisAngle(zmath.Vec{ 0, -1, 0, 0 }, self.yaw);
 
@@ -42,19 +39,20 @@ pub export fn getRotationMatrix() callconv(.C) cglm.mat4s {
     return cglm.glms_mat4_make(&r);
 }
 
-pub export fn getViewMatrix() callconv(.C) cglm.mat4s {
+pub export fn jrCamera_getViewMatrix(self: *JrCamera) callconv(.C) cglm.mat4s {
     const cameraTranslation: zmath.Mat = zmath.translation(self.position.raw[0], self.position.raw[1], self.position.raw[2]);
-    const cameraRotation: zmath.Mat = zmath.matFromArr(@as(*[16]f32, @ptrCast(@constCast(&getRotationMatrix()))).*);
+    const cameraRotation: zmath.Mat = zmath.matFromArr(@as(*[16]f32, @ptrCast(@constCast(&jrCamera_getRotationMatrix(self)))).*);
 
     const r = zmath.matToArr(zmath.inverse(zmath.mul(cameraRotation, cameraTranslation)));
 
     return cglm.glms_mat4_make(&r);
 }
 
-pub export fn keyCallback(window: *zglfw.Window, key: zglfw.Key, scancode: c_int, action: zglfw.Action, mods: zglfw.Mods) callconv(.C) void {
-    _ = window;
+pub export fn jrCamera_keyCallback(window: *zglfw.Window, key: zglfw.Key, scancode: c_int, action: zglfw.Action, mods: zglfw.Mods) callconv(.C) void {
     _ = scancode;
     _ = mods;
+    const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with key callback");
+
     if (action == zglfw.Action.press) {
         if (key == zglfw.Key.w) {
             self.velocity.unnamed_0.z += self.speed * -1;
@@ -90,8 +88,8 @@ pub export fn keyCallback(window: *zglfw.Window, key: zglfw.Key, scancode: c_int
 //    try testing.expect(self.velocity.unnamed_0.z == 1);
 //}
 
-pub export fn cursorPositionCallback(window: *zglfw.Window, xpos: f64, ypos: f64) callconv(.C) void {
-    _ = window;
+pub export fn jrCamera_cursorPositionCallback(window: *zglfw.Window, xpos: f64, ypos: f64) callconv(.C) void {
+    const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with cursor position callback");
 
     const static = struct {
         var firstMouse: bool = true;
@@ -119,20 +117,18 @@ pub export fn cursorPositionCallback(window: *zglfw.Window, xpos: f64, ypos: f64
     if (self.pitch < -89) self.pitch = -89;
 }
 
-pub export fn scrollCallback(window: *zglfw.Window, xoffset: f64, yoffset: f64) callconv(.C) void {
-    _ = window;
+pub export fn jrCamera_scrollCallback(window: *zglfw.Window, xoffset: f64, yoffset: f64) callconv(.C) void {
     _ = xoffset;
-
+    const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with scroll callback");
     self.fov -= @floatCast(yoffset);
 
     if (self.pitch < 1) self.pitch = 1;
     if (self.pitch > 45) self.pitch = 45;
 }
 
-pub export fn update(self_: *JrCamera) callconv(.C) void {
-    self = self_;
+pub export fn jrCamera_update(self: *JrCamera) callconv(.C) void {
     //std.debug.print("({d}, {d}, {d}), ({d}, {d}, {d})\n", .{ self.position.unnamed_0.x, self.position.unnamed_0.y, self.position.unnamed_0.z, self.velocity.unnamed_0.x, self.velocity.unnamed_0.y, self.velocity.unnamed_0.z });
 
-    const cameraRotation: cglm.mat4s = getRotationMatrix();
+    const cameraRotation: cglm.mat4s = jrCamera_getRotationMatrix(self);
     self.position = cglm.glms_vec3_add(self.position, cglm.glms_vec4_copy3(FixedCglm.glms_mat4_mulv(cameraRotation, cglm.glms_vec4(cglm.glms_vec3_scale(self.velocity, 0.5), 0.0))));
 }

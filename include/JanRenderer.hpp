@@ -141,12 +141,18 @@ public:
   int width;
   int height;
 
+  struct GlfwUserPointer {
+    JrCamera *camera;
+    JanRenderer *renderer;
+  };
+
   JanRenderer(const char *applicationName_, int width_, int height_);
   ~JanRenderer();
   void run();
 
 private:
   GLFWwindow *window;
+  GlfwUserPointer *glfwUserPointer;
 
   VkInstance instance;
   VkDebugUtilsMessengerEXT debugMessenger;
@@ -233,6 +239,7 @@ private:
   std::vector<VkBuffer> shaderStorageBuffers;
   std::vector<VkDeviceMemory> shaderStorageBuffersMemory;
 
+  // HMODULE JrClasses_lib; dynamic loading of JrClasses library (old way)
   JrCamera *camera;
   JrGui *gui;
 
@@ -292,13 +299,13 @@ private:
   // initVolk
   void initVolk();
 
+  // initJrObjects
+  void initJrObjects();
+
   // initWindow
   void initWindow();
   static void framebufferResizeCallback(GLFWwindow *window, int width,
                                         int height);
-
-  // initJrClasses
-  void initJrClasses();
 
   // initVulkan
   void initVulkan();

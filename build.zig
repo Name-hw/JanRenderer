@@ -3,10 +3,17 @@ const std = @import("std");
 const fs = std.fs;
 const fmt = std.fmt;
 const mem = std.mem;
+const ArrayList = std.ArrayList;
 
 const CSourceFiles: []const []const u8 =
     &.{"src/JanRenderer/JanRenderer.cpp"};
 const CFlags: []const []const u8 = &.{"-std=c++17"};
+
+const ZigLibs = struct {
+    zmath: *std.Build.Module,
+    zglfw: *std.Build.Module,
+    zgui: *std.Build.Module,
+};
 
 fn absolutePathToRelative(b: *std.Build, path: []const u8) ![]u8 {
     return try mem.replaceOwned(u8, b.allocator, path, "\\", "/");
@@ -74,42 +81,86 @@ fn addPkg_C(b: *std.Build, pkg_name: []const u8, target: std.Build.ResolvedTarge
     return pkg_lib;
 }
 
-//fn addImgui(b: *std.Build, artifact: *std.Build.Step.Compile, zgui: *std.Build.Dependency) !void {
-//    const cwd = fs.cwd();
-//    const zgui_cflags = &.{
-//        //"-fno-sanitize=undefined",
-//        //"-Wno-elaborated-enum-base",
-//        //"-Wno-error=date-time",
-//        //if (options.use_32bit_draw_idx) "-DIMGUI_USE_32BIT_DRAW_INDEX" else "",
-//    };
-//    var zgui_absoluteDir = try cwd.openDir(zgui.path("").getPath(b), .{ .iterate = true });
-//    defer zgui_absoluteDir.close();
+fn findJrObjects(b: *std.Build, absoluteDir: std.fs.Dir) ![][]const u8 {
+    var dir_iterator = absoluteDir.iterate();
 
-//    artifact.addIncludePath(b.path("zig-out/include/imgui"));
-//    artifact.addCSourceFiles(.{
-//        .files = try findCSourceFiles(b, zgui_absoluteDir, &.{
-//            "libs/imgui/imgui.cpp",
-//            "libs/imgui/imgui_widgets.cpp",
-//            "libs/imgui/imgui_tables.cpp",
-//            "libs/imgui/imgui_draw.cpp",
-//            "libs/imgui/imgui_demo.cpp",
-//        }),
-//        .flags = zgui_cflags,
-//    });
-//    artifact.addCSourceFiles(.{
-//        .files = try findCSourceFiles(b, zgui_absoluteDir, &.{
-//            "libs/imgui/backends/imgui_impl_glfw.cpp",
-//            "libs/imgui/backends/imgui_impl_vulkan.cpp",
-//        }),
-//        .flags = zgui_cflags,
-//    });
-//    //for (try findCSourceFiles(b, zgui_absoluteDir, &.{
-//    //    "libs/imgui/backends/imgui_impl_glfw.cpp",
-//    //    "libs/imgui/backends/imgui_impl_vulkan.cpp",
-//    //})) |x| {
-//    //    std.log.debug("{s}", x);
-//    //}
-//}
+    var JrObject_fileNameArrayList = std.ArrayList([]const u8).init(b.allocator);
+    defer JrObject_fileNameArrayList.deinit();
+
+    while (try dir_iterator.next()) |entry| {
+        if (entry.kind == .file and mem.startsWith(u8, entry.name, "Jr")) {
+            try JrObject_fileNameArrayList.append(try b.allocator.dupe(u8, entry.name));
+        }
+    }
+
+    const JrObject_fileNames: [][]const u8 = try JrObject_fileNameArrayList.toOwnedSlice();
+
+    return JrObject_fileNames;
+}
+
+fn removeFileExtension(fileName: []const u8) ![]const u8 {
+    const dotIndex = std.mem.lastIndexOfScalar(u8, fileName, '.') orelse fileName.len;
+    return fileName[0..dotIndex];
+}
+
+fn buildJrObjects(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, step: *std.Build.Step, libs: *const ZigLibs) !ArrayList(*std.Build.Step.Compile) {
+    // current working directory
+    const cwd = fs.cwd();
+
+    // src/JanRenderer/JrObjects/
+    const src_JrObjects_path = b.path("src/JanRenderer/JrObjects/");
+    var src_JrObjects_dir = try cwd.openDir(src_JrObjects_path.getPath(b), .{ .iterate = true });
+    defer src_JrObjects_dir.close();
+
+    // src/JanRenderer/JrObjects/Jr*
+    const JrObject_fileNames = findJrObjects(b, src_JrObjects_dir) catch |err| {
+        std.debug.print("Failed to find JrObjects! ({})\n", .{err});
+        return err;
+    };
+
+    var JrObject_libs = std.ArrayList(*std.Build.Step.Compile).init(b.allocator);
+
+    for (JrObject_fileNames) |JrObject_fileName| {
+        const JrObject_path = src_JrObjects_path.path(b, JrObject_fileName);
+
+        const JrObject_lib = b.addStaticLibrary(.{
+            .name = try removeFileExtension(JrObject_fileName),
+            .root_source_file = JrObject_path,
+            .target = target,
+            .optimize = optimize,
+        });
+        // JrObject_lib C source
+        JrObject_lib.linkLibC();
+        JrObject_lib.addIncludePath(b.path("include/"));
+        // JrObject_lib vcpkg library
+        JrObject_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
+        JrObject_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+        // JrObject_lib zig library
+        JrObject_lib.root_module.addImport("zmath", libs.zmath);
+        JrObject_lib.root_module.addImport("zglfw", libs.zglfw);
+        JrObject_lib.root_module.addImport("zgui", libs.zgui);
+
+        // JrObjects.h (unused)
+        // There are many bugs in zig, so use JrObjects.hpp that I created instead of
+        // this automatically generated header file.
+        //const JrObject_lib_header = JrObject_lib.getEmittedH();
+        //JrObject_lib.installHeader(JrObject_lib_header, "");
+
+        const JrObject_lib_installArtifact = b.addInstallArtifact(JrObject_lib, .{});
+        //JrObject_lib_installArtifact.emitted_h = JrObject_lib_header.;
+        step.dependOn(&JrObject_lib_installArtifact.step);
+
+        try JrObject_libs.append(JrObject_lib);
+    }
+
+    return JrObject_libs;
+}
+
+pub fn linkJrObjects(lib: *std.Build.Step.Compile, JrObject_libs: ArrayList(*std.Build.Step.Compile)) !void {
+    for (JrObject_libs.items) |JrObject_lib| {
+        lib.linkLibrary(JrObject_lib);
+    }
+}
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
@@ -131,6 +182,7 @@ pub fn build(b: *std.Build) !void {
 
     // zmath
     const zmath = b.dependency("zmath", .{});
+    const zmath_module = zmath.module("root");
 
     // zglfw
     const zglfw = b.dependency("zglfw", .{});
@@ -146,57 +198,43 @@ pub fn build(b: *std.Build) !void {
     zgui_lib.root_module.addCMacro("IMGUI_IMPL_VULKAN_USE_VOLK", "");
     zgui_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/")); // to include vulkan
 
-    // coyote-ecs
-    //const coyoteEcs = b.dependency("coyote-ecs", .{});
+    //const installArtifacts = [2]*std.Build.Step.InstallArtifact{
+    //    b.addInstallArtifact(zglfw_lib, .{}),
+    //    b.addInstallArtifact(zgui_lib, .{}),
+    //};
 
-    // JrClasses_lib
-    const JrClasses_lib = b.addStaticLibrary(.{
-        .name = "JrClasses",
-        .root_source_file = b.path("src/JrClasses/JrClasses.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    // JrClasses_lib C source
-    JrClasses_lib.linkLibC();
-    // JrClasses_lib vcpkg library
-    JrClasses_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
-    JrClasses_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
-    // JrClasses_lib zig library
-    JrClasses_lib.root_module.addImport("zmath", zmath.module("root"));
-    JrClasses_lib.root_module.addImport("zglfw", zglfw_module);
-    JrClasses_lib.root_module.addImport("zgui", zgui_module);
-    JrClasses_lib.linkLibrary(zgui_lib);
-    //JrClasses_lib.root_module.addImport("coyoteEcs", coyoteEcs.module(""));
+    // JanRenderer.lib step
+    const lib_step = b.step("lib", "Run the library build step");
+    lib_step.dependOn(&zglfw_lib.step);
+    lib_step.dependOn(&zgui_lib.step);
 
-    // JrClasses.h (unused)
-    // There are many bugs in zig, so use JrClasses.hpp that I created instead of
-    // this automatically generated header file.
-    //const JrClasses_lib_header = JrClasses_lib.getEmittedH();
-    //JrClasses_lib.installHeader(JrClasses_lib_header, "");
+    const JrObject_libs = buildJrObjects(b, target, optimize, lib_step, &.{
+        .zmath = zmath_module,
+        .zglfw = zglfw_module,
+        .zgui = zgui_module,
+    }) catch |err| {
+        std.debug.print("Failed to build JrObjects! ({})\n", .{err});
+        return err;
+    };
 
-    b.installArtifact(JrClasses_lib);
-    const JrClasses_lib_installArtifact = b.addInstallArtifact(JrClasses_lib, .{});
-    //JrClasses_lib_installArtifact.emitted_h = JrClasses_lib_header.;
-    b.getInstallStep().dependOn(&JrClasses_lib_installArtifact.step);
-
-    //// JrClasses_tests (unused)
-    //const JrClasses_tests = b.addTest(.{
-    //    .root_source_file = b.path("src/JrClasses/JrClasses.zig"),
+    //// JrObjects_tests
+    //const JrObjects_tests = b.addTest(.{
+    //    .root_source_file = b.path("src/JrObjects/JrObjects.zig"),
     //    .target = target,
     //    .optimize = optimize,
     //});
-    //// JrClasses_tests C source
-    //JrClasses_tests.linkLibC();
-    //// JrClasses_tests vcpkg library
-    //JrClasses_tests.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
-    //JrClasses_tests.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
-    //JrClasses_tests.linkSystemLibrary("glfw3dll");
-    //// JrClasses_tests zig library
-    //JrClasses_tests.root_module.addImport("zmath", zmath.module("root"));
+    //// JrObjects_tests C source
+    //JrObjects_tests.linkLibC();
+    //// JrObjects_tests vcpkg library
+    //JrObjects_tests.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
+    //JrObjects_tests.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+    //JrObjects_tests.linkSystemLibrary("glfw3dll");
+    //// JrObjects_tests zig library
+    //JrObjects_tests.root_module.addImport("zmath", zmath.module("root"));
 
-    //const JrClasses_unit_tests = b.addRunArtifact(JrClasses_tests);
-    //const test_step = b.step("test", "Run JrClasses unit tests");
-    //test_step.dependOn(&JrClasses_unit_tests.step);
+    //const JrObjects_unit_tests = b.addRunArtifact(JrObjects_tests);
+    //const test_step = b.step("test", "Run JrObjects unit tests");
+    //test_step.dependOn(&JrObjects_unit_tests.step);
 
     // JanRenderer_lib
     const JanRenderer_lib = b.addStaticLibrary(.{
@@ -206,23 +244,26 @@ pub fn build(b: *std.Build) !void {
     });
     // JanRenderer_lib C source
     JanRenderer_lib.linkLibCpp();
-    JanRenderer_lib.linkLibrary(JrClasses_lib);
     JanRenderer_lib.addIncludePath(b.path("src/JanRenderer/"));
     JanRenderer_lib.addIncludePath(b.path("include/"));
     JanRenderer_lib.addCSourceFiles(.{ .root = b.path(""), .files = CSourceFiles, .flags = CFlags });
     // JanRenderer_lib vcpkg library
     JanRenderer_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
     JanRenderer_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+    JanRenderer_lib.installHeadersDirectory(b.path("vcpkg_installed/x64-windows/include/cglm/"), "cglm", .{});
     // JanRenderer_lib zig library
-    JanRenderer_lib.addIncludePath(b.path("zig-out/include/"));
-    JanRenderer_lib.addLibraryPath(b.path("zig-out/bin/"));
     JanRenderer_lib.linkLibrary(zglfw_lib);
+    JanRenderer_lib.linkLibrary(zgui_lib);
     JanRenderer_lib.addIncludePath(zgui.path("libs/imgui"));
 
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step (the default step when
-    // running `zig build`).
-    b.installArtifact(JanRenderer_lib);
+    linkJrObjects(JanRenderer_lib, JrObject_libs) catch |err| {
+        std.debug.print("Failed to link JrObjects with JanRenderer! ({})\n", .{err});
+        return err;
+    };
+
+    const lib_installArtifact = b.addInstallArtifact(JanRenderer_lib, .{});
+
+    lib_step.dependOn(&lib_installArtifact.step);
 
     // TestApp_exe
     const TestApp_exe = b.addExecutable(.{
@@ -238,12 +279,18 @@ pub fn build(b: *std.Build) !void {
     TestApp_exe.linkLibCpp();
     // TestApp_exe zig library
     TestApp_exe.addIncludePath(b.path("zig-out/include/"));
-    TestApp_exe.addLibraryPath(b.path("zig-out/bin/"));
+    TestApp_exe.addLibraryPath(b.path("zig-out/lib/"));
     TestApp_exe.linkLibrary(JanRenderer_lib);
 
-    b.installArtifact(TestApp_exe);
     const exe_installArtifact = b.addInstallArtifact(TestApp_exe, .{});
-    b.getInstallStep().dependOn(&exe_installArtifact.step);
+
+    const exe_step = b.step("exe", "Run the executable build step");
+    exe_step.dependOn(&zglfw_lib.step);
+    exe_step.dependOn(&zgui_lib.step);
+    exe_step.dependOn(&exe_installArtifact.step);
+
+    b.getInstallStep().dependOn(lib_step);
+    b.getInstallStep().dependOn(exe_step);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
@@ -255,7 +302,11 @@ pub fn build(b: *std.Build) !void {
     // directory. This is not necessary, however, if the application depends on
     // other installed files, this ensures they will be present and in the
     // expected location.
-    run_cmd.step.dependOn(b.getInstallStep());
+    run_cmd.step.dependOn(lib_step);
+    run_cmd.step.dependOn(exe_step);
+
+    // The run command is executed inside zig-out/bin/
+    run_cmd.setCwd(b.path("zig-out/bin/"));
 
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`

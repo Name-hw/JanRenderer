@@ -36,10 +36,6 @@
             .url = "git+https://github.com/zig-gamedev/zgui#21dcc288ac5ee70b1fca789d53a06d5c49d51e5e",
             .hash = "zgui-0.6.0-dev--L6sZKTBaADLHp09LtUUifdfFpsczwbnyH7r2ajfVPuJ",
         },
-        .@"coyote-ecs" = .{
-            .url = "git+https://github.com/linuxy/coyote-ecs.git#2b622408880ae865493240a440ae42a2a76828d4",
-            .hash = "N-V-__8AAAf3AACq736mNk-jEwxUCrHYfB6ZiRRMNzOVtrom",
-        },
     },
     .paths = .{
         "build.zig",

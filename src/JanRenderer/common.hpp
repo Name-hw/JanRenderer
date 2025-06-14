@@ -21,6 +21,12 @@
 #include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
 
+// JrObjects
+// There are many bugs in zig, so use JrObjects.hpp that I created instead of
+// this automatically generated header file.
+// #include <JrObjects.h>
+#include "JrObjects.hpp"
+
 // std
 #include <algorithm>
 #include <array>
@@ -37,9 +43,3 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
-
-// JrClasses
-// There are many bugs in zig, so use JrClasses.hpp that I created instead of
-// this automatically generated header file.
-// #include <JrClasses.h>
-#include "JrClasses.hpp"

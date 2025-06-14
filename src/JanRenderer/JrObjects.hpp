@@ -13,14 +13,16 @@ struct JrCamera {
   float speed;
   float fov;
 };
-void init(JrCamera *);
-mat4s getRotationMatrix();
-mat4s getViewMatrix();
-void update(JrCamera *);
-void keyCallback(GLFWwindow *window, int key, int scancode, int action,
-                 int mods);
-void cursorPositionCallback(GLFWwindow *window, double xpos, double ypos);
-void scrollCallback(GLFWwindow *window, double xoffset, double yoffset);
+void jrCamera_init(JrCamera *);
+mat4s jrCamera_getRotationMatrix(JrCamera *);
+mat4s jrCamera_getViewMatrix(JrCamera *);
+void jrCamera_update(JrCamera *);
+void jrCamera_keyCallback(GLFWwindow *window, int key, int scancode, int action,
+                          int mods);
+void jrCamera_cursorPositionCallback(GLFWwindow *window, double xpos,
+                                     double ypos);
+void jrCamera_scrollCallback(GLFWwindow *window, double xoffset,
+                             double yoffset);
 
 struct JrShader {
   VkShaderStageFlagBits stage;
@@ -52,7 +54,7 @@ struct JrGui {
   ImGui_ImplVulkan_InitInfo initInfo;
   void *fontSet;
   ImGuiStyle *style;
-  std::vector<float> *args;
+  void *args;
 };
 void jrGui_init(JrGui *);
 void jrGui_newFrame(JrGui *, uint32_t width, uint32_t height,

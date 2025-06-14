@@ -63,8 +63,8 @@ JanRenderer::~JanRenderer() {};
 
 void JanRenderer::run() {
   initVolk();
+  initJrObjects();
   initWindow();
-  initJrClasses();
   initVulkan();
   initGui();
   mainLoop();
@@ -444,6 +444,27 @@ void JanRenderer::initVolk() {
   }
 }
 
+// initJrObjects
+void JanRenderer::initJrObjects() {
+  /* (old way, using JrClasses.dll)
+  JrClasses_lib = LoadLibrary("JrClasses.dll");
+
+  // JrCamera
+  JrCamera_new jrCamera_new =
+      (JrCamera_new)GetProcAddress(JrClasses_lib, "jrCamera_new");
+  camera = jrCamera_new();
+
+  JrCamera_update jrCamera_update =
+      (JrCamera_new)GetProcAddress(JrClasses_lib, "jrCamera_update");
+  camera = jrCamera_new();
+
+  jrCamera_update(camera);
+  FreeLibrary(JrClasses_lib);
+  */
+  camera = new JrCamera;
+  jrCamera_init(camera);
+}
+
 // initWindow
 void JanRenderer::initWindow() {
   glfwInit();
@@ -455,26 +476,26 @@ void JanRenderer::initWindow() {
   std::cout << width << std::endl;
   std::cout << height << std::endl;
 
+  glfwUserPointer = new GlfwUserPointer;
+  glfwUserPointer->camera = camera;
+  glfwUserPointer->renderer = this;
+
   window = glfwCreateWindow(width, height, applicationName, nullptr, nullptr);
-  glfwSetWindowUserPointer(window, this);
+  glfwSetWindowUserPointer(window, glfwUserPointer);
   glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+
+  glfwSetKeyCallback(window, jrCamera_keyCallback);
+  glfwSetCursorPosCallback(window, jrCamera_cursorPositionCallback);
+  glfwSetScrollCallback(window, jrCamera_scrollCallback);
 }
 
 // initWindow framebufferResizeCallback
 void JanRenderer::framebufferResizeCallback(GLFWwindow *window, int width,
                                             int height) {
-  auto app = reinterpret_cast<JanRenderer *>(glfwGetWindowUserPointer(window));
+  auto app =
+      reinterpret_cast<GlfwUserPointer *>(glfwGetWindowUserPointer(window))
+          ->renderer;
   app->framebufferResized = true;
-}
-
-// initJrClasses
-void JanRenderer::initJrClasses() {
-  camera = new JrCamera;
-  init(camera);
-
-  glfwSetKeyCallback(window, keyCallback);
-  glfwSetCursorPosCallback(window, cursorPositionCallback);
-  glfwSetScrollCallback(window, scrollCallback);
 }
 
 // initVulkan
@@ -2249,11 +2270,11 @@ void JanRenderer::updateUniformBuffer(uint32_t currentImage) {
   //     glm_rad(45.0f), swapChainExtent.width / (float)swapChainExtent.height,
   //     0.1f, 10.0f);
   // ubo.proj.raw[1][1] *= -1;
-  update(camera);
+  jrCamera_update(camera);
 
   UniformBufferObject ubo{};
   ubo.model = GLMS_MAT4_IDENTITY;
-  ubo.view = getViewMatrix();
+  ubo.view = jrCamera_getViewMatrix(camera);
   ubo.proj = glms_perspective(
       glm_rad(camera->fov),
       swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);

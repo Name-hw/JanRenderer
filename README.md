@@ -21,10 +21,10 @@ Rendering engine built with Vulkan written in C++17 and Zig.
 ## **Build**
 
 1. First, install [vcpkg](https://vcpkg.io/) and run 'vcpkg install'.
-2. Build using zig's build system in Visual Studio Code (see shortcuts below).
-3. Executable program and Library files are created in the 'bin' folder.
+2. Build using zig's build system in Visual Studio Code (Check detailed build steps with `zig build -h`).
+3. Executable program and Library files are created.
 
-### Shortcuts
+### Shortcuts (for Vscode users)
 
 - build: Ctrl+Shift+B
 - debug: F5
@@ -44,7 +44,7 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 
 1. Variables: camelCase
 2. Functions: camelCase
-3. Types (including classes, structs, enums, typedefs, etc): PascalCase
+3. Types (including objects, structs, enums, typedefs, etc): PascalCase
 4. Enums: PascalCase
 
 ## **Dependencies**
@@ -61,4 +61,3 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 - [zmath](https://github.com/zig-gamedev/zmath)
 - [zglfw](https://github.com/zig-gamedev/zglfw)
 - [zgui](https://github.com/zig-gamedev/zgui)
-- [coyote-ecs](https://github.com/linuxy/coyote-ecs)
