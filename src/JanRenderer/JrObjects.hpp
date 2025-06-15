@@ -60,6 +60,9 @@ void jrGui_init(JrGui *);
 void jrGui_newFrame(JrGui *, uint32_t width, uint32_t height,
                     uint32_t currentFrame);
 // void jrGui_setupDockSpace(JrGui *);
+void jrGui_recreateSwapChain(JrGui *, VkFormat swapChainImageFormat_,
+                             VkExtent2D swapChainExtent_,
+                             VkImageView *swapChainImageViews_);
 void jrGui_render(JrGui *, uint32_t imageIndex, uint32_t waitSemaphoreCount,
                   VkSemaphore *pWaitSemaphores, VkFence fence);
 void jrGui_destroy(JrGui *);
