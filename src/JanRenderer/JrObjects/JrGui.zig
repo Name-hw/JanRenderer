@@ -205,6 +205,7 @@ pub fn createFramebuffers(self: *JrGui) void {
             .height = self.swapChainExtent.height,
             .layers = 1,
         };
+
         if (volk.vkCreateFramebuffer.?(self.device, &framebufferInfo, null, &self.swapChainFramebuffers[i]) != volk.VK_SUCCESS) {
             @panic("Failed to create framebuffer!");
         }
@@ -271,6 +272,8 @@ pub export fn jrGui_newFrame(self: *JrGui, width: u32, height: u32, currentFrame
 
         zgui.bulletText("FPS: {d:.1}", .{zgui.io.getFramerate()});
         zgui.bulletText("Frame Time: {d:.3}", .{1000 / zgui.io.getFramerate()});
+        zgui.bulletText("width: {d}", .{width});
+        zgui.bulletText("height: {d}", .{height});
 
         zgui.end();
     }
@@ -283,6 +286,15 @@ pub export fn jrGui_newFrame(self: *JrGui, width: u32, height: u32, currentFrame
 //    const dockSpace = zgui.DockSpaceOverViewport(zgui.getMainViewport().getId(), zgui.getMainViewport(), dockNodeFlags);
 //    _ = dockSpace;
 //}
+
+pub export fn jrGui_recreateSwapChain(self: *JrGui, swapChainImageFormat_: volk.VkFormat, swapChainExtent_: volk.VkExtent2D, swapChainImageViews_: *[3]volk.VkImageView) callconv(.C) void {
+    self.swapChainImageFormat = swapChainImageFormat_;
+    self.swapChainExtent = swapChainExtent_;
+    self.swapChainImageViews = swapChainImageViews_;
+
+    destroyFramebuffers(self);
+    createFramebuffers(self);
+}
 
 pub export fn jrGui_render(self: *JrGui, imageIndex: u32, waitSemaphoreCount: u32, pWaitSemaphores: *volk.VkSemaphore, fence: volk.VkFence) callconv(.C) void {
     _ = volk.vkResetCommandBuffer.?(self.commandBuffers[self.currentFrame], 0);
@@ -313,6 +325,7 @@ pub export fn jrGui_render(self: *JrGui, imageIndex: u32, waitSemaphoreCount: u3
     zgui.updatePlatformWindows();
     zgui.renderPlatformWindowsDefault();
 }
+
 pub fn recordCommandBuffer(self: *JrGui, imageIndex: u32) void {
     var beginInfo = volk.VkCommandBufferBeginInfo{
         .sType = volk.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -352,9 +365,8 @@ pub export fn jrGui_destroy(self: *JrGui) callconv(.C) void {
     zgui.backend.deinit();
     zgui.deinit();
 
-    for (0..2) |i| {
-        volk.vkDestroyFramebuffer.?(self.device, self.swapChainFramebuffers[i], null);
-    }
+    destroyFramebuffers(self);
+
     volk.vkDestroyRenderPass.?(self.device, self.renderPass, null);
 
     volk.vkDestroyDescriptorPool.?(self.device, self.descriptorPool, null);
@@ -362,5 +374,11 @@ pub export fn jrGui_destroy(self: *JrGui) callconv(.C) void {
 
     for (0..2) |i| {
         volk.vkDestroySemaphore.?(self.device, self.renderFinishedSemaphores[i], null);
+    }
+}
+
+pub fn destroyFramebuffers(self: *JrGui) void {
+    for (0..2) |i| {
+        volk.vkDestroyFramebuffer.?(self.device, self.swapChainFramebuffers[i], null);
     }
 }

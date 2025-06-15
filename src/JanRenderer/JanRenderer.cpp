@@ -2096,6 +2096,8 @@ void JanRenderer::drawFrame() {
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     recreateSwapChain();
+    jrGui_recreateSwapChain(gui, swapChainImageFormat, swapChainExtent,
+                            swapChainImageViews.data());
     return;
   } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
     throw std::runtime_error("failed to acquire swap chain image!");
@@ -2150,6 +2152,8 @@ void JanRenderer::drawFrame() {
       framebufferResized) {
     framebufferResized = false;
     recreateSwapChain();
+    jrGui_recreateSwapChain(gui, swapChainImageFormat, swapChainExtent,
+                            swapChainImageViews.data());
   } else if (result != VK_SUCCESS) {
     throw std::runtime_error("failed to present swap chain image!");
   }
@@ -2285,7 +2289,6 @@ void JanRenderer::updateUniformBuffer(uint32_t currentImage) {
 
 // mainLoop drawFrame recreateSwapChain
 void JanRenderer::recreateSwapChain() {
-  int width = 0, height = 0;
   glfwGetFramebufferSize(window, &width, &height);
   while (width == 0 || height == 0) {
     glfwGetFramebufferSize(window, &width, &height);
