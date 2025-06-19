@@ -66,6 +66,7 @@ void JanRenderer::run() {
   initJrObjects();
   initWindow();
   initVulkan();
+  initGui();
   mainLoop();
   cleanup();
 }
@@ -83,7 +84,7 @@ void JanRenderer::populateDebugMessengerCreateInfo(
   createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-  createInfo.pfnUserCallback = debugCallback;
+  createInfo.pfnUserCallback = vkDebugCallback;
 }
 
 QueueFamily JanRenderer::getQueueFamily(VkPhysicalDevice physicalDevice_) {
@@ -960,7 +961,7 @@ void JanRenderer::createRenderPass() {
   colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
   colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+  colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
   VkAttachmentReference colorAttachmentResolveRef{};
   colorAttachmentResolveRef.attachment = 2;
@@ -2021,10 +2022,43 @@ void JanRenderer::createSyncObjects() {
   }
 }
 
+// initGui
+void JanRenderer::initGui() {
+  ImGui_ImplVulkan_InitInfo initInfo{};
+  initInfo.Instance = instance;
+  initInfo.PhysicalDevice = physicalDevice;
+  initInfo.MinImageCount = 3;
+  initInfo.ImageCount = 3;
+  initInfo.MinAllocationSize = 1024 * 1024;
+
+  JrGuiViewModel *guiViewModel = new JrGuiViewModel;
+  guiViewModel->CameraPosition = &camera->position;
+  guiViewModel->CameraVelocity = &camera->velocity;
+  guiViewModel->CameraPitch = &camera->pitch;
+  guiViewModel->CameraYaw = &camera->yaw;
+  guiViewModel->CameraFOV = &camera->fov;
+  guiViewModel->CameraSpeed = &camera->speed;
+
+  gui = new JrGui;
+  gui->device = device;
+  gui->queueFamilyIndex = queueFamily.graphicsFamily.value();
+  gui->queue = graphicsQueue;
+  gui->swapChainImageFormat = swapChainImageFormat;
+  gui->swapChainExtent = swapChainExtent;
+  gui->swapChainImageViews = swapChainImageViews.data();
+  gui->msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+  gui->window = window;
+  gui->initInfo = initInfo;
+  gui->viewModel = guiViewModel;
+
+  jrGui_init(gui);
+};
+
 // mainLoop
 void JanRenderer::mainLoop() {
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+    jrGui_newFrame(gui, width, height, currentFrame);
     drawFrame();
   }
 
@@ -2070,6 +2104,8 @@ void JanRenderer::drawFrame() {
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     recreateSwapChain();
+    jrGui_recreateSwapChain(gui, swapChainImageFormat, swapChainExtent,
+                            swapChainImageViews.data());
     return;
   } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
     throw std::runtime_error("failed to acquire swap chain image!");
@@ -2099,18 +2135,19 @@ void JanRenderer::drawFrame() {
   graphicsSubmitInfo.signalSemaphoreCount = 1;
   graphicsSubmitInfo.pSignalSemaphores = signalSemaphores;
 
-  if (vkQueueSubmit(graphicsQueue, 1, &graphicsSubmitInfo,
-                    inFlightFences[currentFrame]) != VK_SUCCESS) {
+  if (vkQueueSubmit(graphicsQueue, 1, &graphicsSubmitInfo, nullptr) !=
+      VK_SUCCESS) {
     throw std::runtime_error("failed to submit draw command buffer!");
   }
+
+  jrGui_render(gui, imageIndex, 1, signalSemaphores,
+               inFlightFences[currentFrame]);
 
   VkSwapchainKHR swapChains[] = {swapChain};
   VkPresentInfoKHR presentInfo{};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
   presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores = signalSemaphores;
-
+  presentInfo.pWaitSemaphores = &gui->renderFinishedSemaphores[currentFrame];
   presentInfo.swapchainCount = 1;
   presentInfo.pSwapchains = swapChains;
   presentInfo.pImageIndices = &imageIndex;
@@ -2123,6 +2160,8 @@ void JanRenderer::drawFrame() {
       framebufferResized) {
     framebufferResized = false;
     recreateSwapChain();
+    jrGui_recreateSwapChain(gui, swapChainImageFormat, swapChainExtent,
+                            swapChainImageViews.data());
   } else if (result != VK_SUCCESS) {
     throw std::runtime_error("failed to present swap chain image!");
   }
@@ -2258,7 +2297,6 @@ void JanRenderer::updateUniformBuffer(uint32_t currentImage) {
 
 // mainLoop drawFrame recreateSwapChain
 void JanRenderer::recreateSwapChain() {
-  int width = 0, height = 0;
   glfwGetFramebufferSize(window, &width, &height);
   while (width == 0 || height == 0) {
     glfwGetFramebufferSize(window, &width, &height);
@@ -2279,6 +2317,8 @@ void JanRenderer::recreateSwapChain() {
 // cleanup
 void JanRenderer::cleanup() {
   free(applicationName);
+
+  jrGui_destroy(gui);
 
   cleanupSwapChain();
 

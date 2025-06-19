@@ -16,6 +16,11 @@
 #define CGLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <cglm/struct.h>
 
+// imgui
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_vulkan.h>
+#include <imgui.h>
+
 // JrObjects
 // There are many bugs in zig, so use JrObjects.hpp that I created instead of
 // this automatically generated header file.

@@ -46,13 +46,15 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 2. Functions: camelCase
 3. Types (including objects, structs, enums, typedefs, etc): PascalCase
 4. Enums: PascalCase
+5. View (text displayed in GUI): Title Case
+6. ViewModel: PascalCase
+7. Abbreviations: Capitalized
 
 ## **Dependencies**
 
 ### Vcpkg
 
 - [volk](https://github.com/zeux/volk)
-- [glfw](https://github.com/glfw/glfw)
 - [cglm](https://github.com/recp/cglm)
 - [stb](https://github.com/nothings/stb)
 - [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader)
@@ -60,3 +62,5 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 ### Zig build system
 
 - [zmath](https://github.com/zig-gamedev/zmath)
+- [zglfw](https://github.com/zig-gamedev/zglfw)
+- [zgui](https://github.com/zig-gamedev/zgui)

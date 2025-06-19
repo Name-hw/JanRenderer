@@ -9,19 +9,41 @@ const CSourceFiles: []const []const u8 =
     &.{"src/JanRenderer/JanRenderer.cpp"};
 const CFlags: []const []const u8 = &.{"-std=c++17"};
 
-fn findCSourceFiles(b: *std.Build, absoluteDir: std.fs.Dir) ![]const []const u8 {
+const ZigLibs = struct {
+    zmath: *std.Build.Module,
+    zglfw: *std.Build.Module,
+    zgui: *std.Build.Module,
+};
+
+fn absolutePathToRelative(b: *std.Build, path: []const u8) ![]u8 {
+    return try mem.replaceOwned(u8, b.allocator, path, "\\", "/");
+}
+
+fn findCSourceFiles(b: *std.Build, absoluteDir: std.fs.Dir, fileNames: ?[]const []const u8) ![]const []const u8 {
     var dir_walker = try absoluteDir.walk(b.allocator);
     defer dir_walker.deinit();
 
     var src_files_arrayList = std.ArrayList([]const u8).init(b.allocator);
-    while (try dir_walker.next()) |entry| {
-        if (entry.kind == .file and mem.endsWith(u8, entry.basename, "c") and mem.endsWith(u8, entry.basename, "h")) {
-            const path =
-                try std.mem.replaceOwned(u8, b.allocator, entry.path, "\\", "/");
-            try src_files_arrayList.append(path);
+
+    if (fileNames) |fileNames_| {
+        while (try dir_walker.next()) |entry| {
+            for (fileNames_) |fileName| {
+                if (mem.eql(u8, entry.basename, fileName)) {
+                    const path = try absolutePathToRelative(b, entry.path);
+
+                    try src_files_arrayList.append(path);
+                }
+            }
+        }
+    } else {
+        while (try dir_walker.next()) |entry| {
+            if (entry.kind == .file and mem.endsWith(u8, entry.basename, "c") and mem.endsWith(u8, entry.basename, "h")) {
+                const path = try absolutePathToRelative(b, entry.path);
+
+                try src_files_arrayList.append(path);
+            }
         }
     }
-
     return src_files_arrayList.items;
 }
 
@@ -81,10 +103,7 @@ fn removeFileExtension(fileName: []const u8) ![]const u8 {
     return fileName[0..dotIndex];
 }
 
-fn buildJrObjects(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, step: *std.Build.Step) !ArrayList(*std.Build.Step.Compile) {
-    // library
-    const zmath = b.dependency("zmath", .{});
-
+fn buildJrObjects(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, step: *std.Build.Step, libs: *const ZigLibs) !ArrayList(*std.Build.Step.Compile) {
     // current working directory
     const cwd = fs.cwd();
 
@@ -117,7 +136,9 @@ fn buildJrObjects(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
         JrObject_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
         JrObject_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
         // JrObject_lib zig library
-        JrObject_lib.root_module.addImport("zmath", zmath.module("root"));
+        JrObject_lib.root_module.addImport("zmath", libs.zmath);
+        JrObject_lib.root_module.addImport("zglfw", libs.zglfw);
+        JrObject_lib.root_module.addImport("zgui", libs.zgui);
 
         // JrObjects.h (unused)
         // There are many bugs in zig, so use JrObjects.hpp that I created instead of
@@ -159,18 +180,39 @@ pub fn build(b: *std.Build) !void {
 
     //const optimize_pkg = .ReleaseFast;
 
-    // glfw
-    const glfw_installFiles = [2]*std.Build.Step.InstallFile{
-        b.addInstallBinFile(b.path("vcpkg_installed/x64-windows/bin/glfw3.dll"), "glfw3.dll"),
-        b.addInstallLibFile(b.path("vcpkg_installed/x64-windows/lib/glfw3dll.lib"), "glfw3dll.lib"),
-    };
+    // zmath
+    const zmath = b.dependency("zmath", .{});
+    const zmath_module = zmath.module("root");
+
+    // zglfw
+    const zglfw = b.dependency("zglfw", .{});
+    const zglfw_module = zglfw.module("root");
+    const zglfw_lib = zglfw.artifact("glfw");
+
+    // zgui
+    const zgui = b.dependency("zgui", .{
+        .backend = .glfw_vulkan,
+    });
+    const zgui_module = zgui.module("root");
+    const zgui_lib = zgui.artifact("imgui");
+    zgui_lib.root_module.addCMacro("IMGUI_IMPL_VULKAN_USE_VOLK", "");
+    zgui_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/")); // to include vulkan
+
+    //const installArtifacts = [2]*std.Build.Step.InstallArtifact{
+    //    b.addInstallArtifact(zglfw_lib, .{}),
+    //    b.addInstallArtifact(zgui_lib, .{}),
+    //};
 
     // JanRenderer.lib step
     const lib_step = b.step("lib", "Run the library build step");
-    lib_step.dependOn(&glfw_installFiles[0].step);
-    lib_step.dependOn(&glfw_installFiles[1].step);
+    lib_step.dependOn(&zglfw_lib.step);
+    lib_step.dependOn(&zgui_lib.step);
 
-    const JrObject_libs = buildJrObjects(b, target, optimize, lib_step) catch |err| {
+    const JrObject_libs = buildJrObjects(b, target, optimize, lib_step, &.{
+        .zmath = zmath_module,
+        .zglfw = zglfw_module,
+        .zgui = zgui_module,
+    }) catch |err| {
         std.debug.print("Failed to build JrObjects! ({})\n", .{err});
         return err;
     };
@@ -208,9 +250,11 @@ pub fn build(b: *std.Build) !void {
     // JanRenderer_lib vcpkg library
     JanRenderer_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
     JanRenderer_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
-    JanRenderer_lib.linkSystemLibrary("glfw3dll");
-
     JanRenderer_lib.installHeadersDirectory(b.path("vcpkg_installed/x64-windows/include/cglm/"), "cglm", .{});
+    // JanRenderer_lib zig library
+    JanRenderer_lib.linkLibrary(zglfw_lib);
+    JanRenderer_lib.linkLibrary(zgui_lib);
+    JanRenderer_lib.addIncludePath(zgui.path("libs/imgui"));
 
     linkJrObjects(JanRenderer_lib, JrObject_libs) catch |err| {
         std.debug.print("Failed to link JrObjects with JanRenderer! ({})\n", .{err});
@@ -232,6 +276,8 @@ pub fn build(b: *std.Build) !void {
     });
     // TestApp_exe C source
     TestApp_exe.linkLibC();
+    TestApp_exe.linkLibCpp();
+    // TestApp_exe zig library
     TestApp_exe.addIncludePath(b.path("zig-out/include/"));
     TestApp_exe.addLibraryPath(b.path("zig-out/lib/"));
     TestApp_exe.linkLibrary(JanRenderer_lib);
@@ -239,8 +285,8 @@ pub fn build(b: *std.Build) !void {
     const exe_installArtifact = b.addInstallArtifact(TestApp_exe, .{});
 
     const exe_step = b.step("exe", "Run the executable build step");
-    exe_step.dependOn(&glfw_installFiles[0].step);
-    exe_step.dependOn(&glfw_installFiles[1].step);
+    exe_step.dependOn(&zglfw_lib.step);
+    exe_step.dependOn(&zgui_lib.step);
     exe_step.dependOn(&exe_installArtifact.step);
 
     b.getInstallStep().dependOn(lib_step);
