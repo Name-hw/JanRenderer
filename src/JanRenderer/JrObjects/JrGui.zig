@@ -25,12 +25,12 @@ pub const FontSet = struct {
     medium: zgui.Font,
     bold: zgui.Font,
 
-    pub fn init(self: *FontSet) !void {
-        self.light = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Light.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
-        self.regular = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Regular.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
-        self.medium = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Medium.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
-        self.bold = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Bold.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
-    }
+    //pub fn init(self: *FontSet) !void {
+    //    self.light = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Light.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
+    //    self.regular = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Regular.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
+    //    self.medium = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Medium.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
+    //    self.bold = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Bold.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
+    //}
 };
 
 // MVVM pattern
@@ -105,7 +105,7 @@ pub export fn jrGui_init(self: *JrGui) callconv(.C) void {
         .medium = undefined,
         .bold = undefined,
     };
-    fontSet.init() catch {};
+    //fontSet.init() catch {};
     self.fontSet = &fontSet;
     self.style = zgui.getStyle();
 
@@ -116,7 +116,7 @@ pub export fn jrGui_init(self: *JrGui) callconv(.C) void {
         .viewport_enable = true,
     };
     zgui.io.setConfigFlags(configFlags);
-    zgui.io.setDefaultFont(self.fontSet.regular);
+    //zgui.io.setDefaultFont(self.fontSet.regular);
 }
 
 pub export fn checkVkResult(err: u32) callconv(.C) void {
