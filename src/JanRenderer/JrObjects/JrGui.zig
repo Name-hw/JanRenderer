@@ -258,7 +258,7 @@ pub fn createSyncObjects(self: *JrGui) void {
         .sType = volk.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
     };
 
-    for (0..2) |i| {
+    for (0..3) |i| {
         if (volk.vkCreateSemaphore.?(self.device, &semaphoreInfo, null, &self.renderFinishedSemaphores[i]) != volk.VK_SUCCESS) {
             @panic("Failed to create synchronization objects for a frame!");
         }
@@ -293,9 +293,9 @@ pub export fn jrGui_newFrame(self: *JrGui, width: u32, height: u32, currentFrame
         zgui.bulletText("Frame Time: {d:.3}", .{1000 / zgui.io.getFramerate()});
         zgui.bulletText("Width: {d}", .{width});
         zgui.bulletText("Height: {d}", .{height});
-
-        zgui.end();
     }
+    zgui.end();
+
     zgui.showDemoWindow(null);
 }
 
@@ -332,7 +332,7 @@ pub export fn jrGui_render(self: *JrGui, imageIndex: u32, waitSemaphoreCount: u3
         .commandBufferCount = 1,
         .pCommandBuffers = &self.commandBuffers[self.currentFrame],
         .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &self.renderFinishedSemaphores,
+        .pSignalSemaphores = &self.renderFinishedSemaphores[self.currentFrame],
     };
 
     if (volk.vkQueueSubmit.?(self.queue, 1, &submitInfo, fence) != volk.VK_SUCCESS) {
@@ -391,13 +391,13 @@ pub export fn jrGui_destroy(self: *JrGui) callconv(.C) void {
     volk.vkDestroyDescriptorPool.?(self.device, self.descriptorPool, null);
     volk.vkDestroyCommandPool.?(self.device, self.commandPool, null);
 
-    for (0..2) |i| {
-        volk.vkDestroySemaphore.?(self.device, self.renderFinishedSemaphores[i], null);
+    for (self.renderFinishedSemaphores) |renderFinishedSemaphore| {
+        volk.vkDestroySemaphore.?(self.device, renderFinishedSemaphore, null);
     }
 }
 
 pub fn destroyFramebuffers(self: *JrGui) void {
-    for (0..2) |i| {
-        volk.vkDestroyFramebuffer.?(self.device, self.swapChainFramebuffers[i], null);
+    for (self.swapChainFramebuffers) |framebuffer| {
+        volk.vkDestroyFramebuffer.?(self.device, framebuffer, null);
     }
 }

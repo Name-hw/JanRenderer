@@ -2147,7 +2147,7 @@ void JanRenderer::drawFrame() {
   VkPresentInfoKHR presentInfo{};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
   presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores = gui->renderFinishedSemaphores;
+  presentInfo.pWaitSemaphores = &gui->renderFinishedSemaphores[currentFrame];
   presentInfo.swapchainCount = 1;
   presentInfo.pSwapchains = swapChains;
   presentInfo.pImageIndices = &imageIndex;
