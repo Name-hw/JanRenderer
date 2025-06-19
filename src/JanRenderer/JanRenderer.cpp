@@ -2031,6 +2031,14 @@ void JanRenderer::initGui() {
   initInfo.ImageCount = 3;
   initInfo.MinAllocationSize = 1024 * 1024;
 
+  JrGuiViewModel *guiViewModel = new JrGuiViewModel;
+  guiViewModel->CameraPosition = &camera->position;
+  guiViewModel->CameraVelocity = &camera->velocity;
+  guiViewModel->CameraPitch = &camera->pitch;
+  guiViewModel->CameraYaw = &camera->yaw;
+  guiViewModel->CameraFOV = &camera->fov;
+  guiViewModel->CameraSpeed = &camera->speed;
+
   gui = new JrGui;
   gui->device = device;
   gui->queueFamilyIndex = queueFamily.graphicsFamily.value();
@@ -2041,7 +2049,7 @@ void JanRenderer::initGui() {
   gui->msaaSamples = VK_SAMPLE_COUNT_1_BIT;
   gui->window = window;
   gui->initInfo = initInfo;
-  gui->args = nullptr;
+  gui->viewModel = guiViewModel;
 
   jrGui_init(gui);
 };

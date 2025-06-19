@@ -2,6 +2,10 @@ const std = @import("std");
 const volk = @cImport({
     @cInclude("volk.h");
 });
+const cglm = @cImport({
+    @cDefine("CGLM_FORCE_DEPTH_ZERO_TO_ONE", "");
+    @cInclude("cglm/struct.h");
+});
 const zmath = @import("zmath");
 const zglfw = @import("zglfw");
 const zgui = @import("zgui");
@@ -29,6 +33,16 @@ pub const FontSet = struct {
     }
 };
 
+// MVVM pattern
+pub const JrGuiViewModel = extern struct {
+    CameraPosition: *cglm.vec3s,
+    CameraVelocity: *cglm.vec3s,
+    CameraPitch: *f32,
+    CameraYaw: *f32,
+    CameraFOV: *f32,
+    CameraSpeed: *f32,
+};
+
 pub const JrGui = extern struct {
     device: volk.VkDevice,
     queueFamilyIndex: u32,
@@ -50,7 +64,7 @@ pub const JrGui = extern struct {
     initInfo: zgui.backend.ImGui_ImplVulkan_InitInfo,
     fontSet: *FontSet,
     style: *zgui.Style,
-    args: *std.ArrayList(f32),
+    viewModel: *JrGuiViewModel,
 };
 
 // Will use this in other code
@@ -257,23 +271,28 @@ pub export fn jrGui_newFrame(self: *JrGui, width: u32, height: u32, currentFrame
 
     if (zgui.begin("window", .{})) {
         zgui.bulletText("한글 테스트 {d}", .{1});
+
         zgui.spacing();
 
-        if (zgui.button("Setup Scene", .{})) {
-            // Button pressed.
-        }
         //if (zgui.dragFloat("Drag 1", .{ .v = &self.args.items[0] })) {
         //    // value0 has changed
         //}
 
-        //if (zgui.dragFloat("Drag 2", .{ .v = &self.args.items[0], .min = -1.0, .max = 1.0 })) {
-        //    // value1 has changed
-        //}
+        if (zgui.collapsingHeader("Camera", .{})) {
+            _ = zgui.inputFloat3("Camera Position", .{ .v = &self.viewModel.CameraPosition.raw });
+            _ = zgui.inputFloat3("Camera Velocity", .{ .v = &self.viewModel.CameraVelocity.raw });
+            _ = zgui.inputFloat("Camera Pitch", .{ .v = self.viewModel.CameraPitch });
+            _ = zgui.inputFloat("Camera Yaw", .{ .v = self.viewModel.CameraYaw });
+            _ = zgui.inputFloat("Camera FOV", .{ .v = self.viewModel.CameraFOV });
+            _ = zgui.sliderFloat("Camera Speed", .{ .v = self.viewModel.CameraSpeed, .min = 0.0, .max = 1.0 });
+        }
+
+        zgui.spacing();
 
         zgui.bulletText("FPS: {d:.1}", .{zgui.io.getFramerate()});
         zgui.bulletText("Frame Time: {d:.3}", .{1000 / zgui.io.getFramerate()});
-        zgui.bulletText("width: {d}", .{width});
-        zgui.bulletText("height: {d}", .{height});
+        zgui.bulletText("Width: {d}", .{width});
+        zgui.bulletText("Height: {d}", .{height});
 
         zgui.end();
     }

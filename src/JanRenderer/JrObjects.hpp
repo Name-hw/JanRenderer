@@ -35,6 +35,15 @@ struct JrShader {
 void createLinkedShaders(VkDevice device, JrShader *vertShader,
                          JrShader *fragShader);
 
+struct JrGuiViewModel {
+  vec3s *CameraPosition;
+  vec3s *CameraVelocity;
+  float *CameraPitch;
+  float *CameraYaw;
+  float *CameraFOV;
+  float *CameraSpeed;
+};
+
 struct JrGui {
   VkDevice device;
   uint32_t queueFamilyIndex;
@@ -54,7 +63,7 @@ struct JrGui {
   ImGui_ImplVulkan_InitInfo initInfo;
   void *fontSet;
   ImGuiStyle *style;
-  void *args;
+  JrGuiViewModel *viewModel;
 };
 void jrGui_init(JrGui *);
 void jrGui_newFrame(JrGui *, uint32_t width, uint32_t height,

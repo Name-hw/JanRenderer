@@ -46,6 +46,9 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 2. Functions: camelCase
 3. Types (including objects, structs, enums, typedefs, etc): PascalCase
 4. Enums: PascalCase
+5. View (text displayed in GUI): Title Case
+6. ViewModel: PascalCase
+7. Abbreviations: Capitalized
 
 ## **Dependencies**
 
