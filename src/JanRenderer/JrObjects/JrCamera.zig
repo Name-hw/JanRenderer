@@ -17,7 +17,9 @@ pub const JrCamera = extern struct {
     yaw: f32,
 
     speed: f32,
-    fov: f32,
+    fieldOfView: f32,
+
+    isRotatable: bool,
 };
 
 pub export fn jrCamera_init(self: *JrCamera) callconv(.C) void {
@@ -26,8 +28,11 @@ pub export fn jrCamera_init(self: *JrCamera) callconv(.C) void {
 
     self.pitch = 0.0;
     self.yaw = 0.0;
+
     self.speed = 0.05;
-    self.fov = 45;
+    self.fieldOfView = 45;
+
+    self.isRotatable = false;
 }
 
 pub export fn jrCamera_getRotationMatrix(self: *JrCamera) callconv(.C) cglm.mat4s {
@@ -90,45 +95,60 @@ pub export fn jrCamera_keyCallback(window: *zglfw.Window, key: zglfw.Key, scanco
 
 pub export fn jrCamera_cursorPositionCallback(window: *zglfw.Window, xpos: f64, ypos: f64) callconv(.C) void {
     const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with cursor position callback");
-
     const static = struct {
         var firstMouse: bool = true;
         var lastXpos: f64 = 0;
         var lastYpos: f64 = 0;
     };
 
-    if (static.firstMouse) {
-        static.lastXpos = xpos;
-        static.lastYpos = ypos;
-        static.firstMouse = false;
+    if (self.isRotatable) {
+        if (static.firstMouse) {
+            static.lastXpos = xpos;
+            static.lastYpos = ypos;
+            static.firstMouse = false;
+        }
+
+        const sensitivity = 0.01;
+
+        const xoffset = (xpos - static.lastXpos) * sensitivity;
+        const yoffset = (ypos - static.lastYpos) * sensitivity;
+
+        self.yaw += @floatCast(xoffset);
+        self.pitch -= @floatCast(yoffset);
+
+        if (self.pitch > 89) self.pitch = 89;
+        if (self.pitch < -89) self.pitch = -89;
     }
 
-    const sensitivity = 0.01;
-
-    const xoffset = (xpos - static.lastXpos) * sensitivity;
-    const yoffset = (ypos - static.lastYpos) * sensitivity;
     static.lastXpos = xpos;
     static.lastYpos = ypos;
+}
 
-    self.yaw += @floatCast(xoffset);
-    self.pitch -= @floatCast(yoffset);
+pub export fn jrCamera_mouseButtonCallback(window: *zglfw.Window, button: zglfw.MouseButton, action: zglfw.Action, mods: zglfw.Mods) callconv(.C) void {
+    _ = mods;
+    const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with mouse button callback");
 
-    if (self.pitch > 89) self.pitch = 89;
-    if (self.pitch < -89) self.pitch = -89;
+    if (button == zglfw.MouseButton.right) {
+        if (action == zglfw.Action.press) {
+            self.isRotatable = true;
+        } else if (action == zglfw.Action.release) {
+            self.isRotatable = false;
+        }
+    }
 }
 
 pub export fn jrCamera_scrollCallback(window: *zglfw.Window, xoffset: f64, yoffset: f64) callconv(.C) void {
     _ = xoffset;
     const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with scroll callback");
-    self.fov -= @floatCast(yoffset);
+    self.fieldOfView -= @floatCast(yoffset);
 
-    if (self.pitch < 1) self.pitch = 1;
-    if (self.pitch > 45) self.pitch = 45;
+    if (self.fieldOfView < 1) self.fieldOfView = 1;
+    if (self.fieldOfView > 180) self.fieldOfView = 180;
 }
 
-pub export fn jrCamera_update(self: *JrCamera) callconv(.C) void {
+pub export fn jrCamera_update(self: *JrCamera, deltaTime: f32) callconv(.C) void {
     //std.debug.print("({d}, {d}, {d}), ({d}, {d}, {d})\n", .{ self.position.unnamed_0.x, self.position.unnamed_0.y, self.position.unnamed_0.z, self.velocity.unnamed_0.x, self.velocity.unnamed_0.y, self.velocity.unnamed_0.z });
 
     const cameraRotation: cglm.mat4s = jrCamera_getRotationMatrix(self);
-    self.position = cglm.glms_vec3_add(self.position, cglm.glms_vec4_copy3(FixedCglm.glms_mat4_mulv(cameraRotation, cglm.glms_vec4(cglm.glms_vec3_scale(self.velocity, 0.5), 0.0))));
+    self.position = cglm.glms_vec3_add(self.position, cglm.glms_vec4_copy3(FixedCglm.glms_mat4_mulv(cameraRotation, cglm.glms_vec4(cglm.glms_vec3_scale(self.velocity, deltaTime), 0.0))));
 }

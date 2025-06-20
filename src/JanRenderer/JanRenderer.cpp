@@ -486,6 +486,7 @@ void JanRenderer::initWindow() {
 
   glfwSetKeyCallback(window, jrCamera_keyCallback);
   glfwSetCursorPosCallback(window, jrCamera_cursorPositionCallback);
+  glfwSetMouseButtonCallback(window, jrCamera_mouseButtonCallback);
   glfwSetScrollCallback(window, jrCamera_scrollCallback);
 }
 
@@ -2036,8 +2037,9 @@ void JanRenderer::initGui() {
   guiViewModel->CameraVelocity = &camera->velocity;
   guiViewModel->CameraPitch = &camera->pitch;
   guiViewModel->CameraYaw = &camera->yaw;
-  guiViewModel->CameraFOV = &camera->fov;
   guiViewModel->CameraSpeed = &camera->speed;
+  guiViewModel->CameraFieldOfView = &camera->fieldOfView;
+  guiViewModel->CameraIsRotatable = &camera->isRotatable;
 
   gui = new JrGui;
   gui->device = device;
@@ -2057,12 +2059,21 @@ void JanRenderer::initGui() {
 // mainLoop
 void JanRenderer::mainLoop() {
   while (!glfwWindowShouldClose(window)) {
+    updateDeltaTime();
     glfwPollEvents();
+    jrCamera_update(camera, deltaTime);
     jrGui_newFrame(gui, width, height, currentFrame);
     drawFrame();
   }
 
   vkDeviceWaitIdle(device);
+}
+
+// mainLoop updateDeltaTime
+void JanRenderer::updateDeltaTime() {
+  float timeOfCurrentFrame = glfwGetTime();
+  deltaTime = timeOfCurrentFrame - timeOfLastFrame;
+  timeOfLastFrame = timeOfCurrentFrame;
 }
 
 // mainLoop drawFrame
@@ -2282,13 +2293,12 @@ void JanRenderer::updateUniformBuffer(uint32_t currentImage) {
   //     glm_rad(45.0f), swapChainExtent.width / (float)swapChainExtent.height,
   //     0.1f, 10.0f);
   // ubo.proj.raw[1][1] *= -1;
-  jrCamera_update(camera);
 
   UniformBufferObject ubo{};
   ubo.model = GLMS_MAT4_IDENTITY;
   ubo.view = jrCamera_getViewMatrix(camera);
   ubo.proj = glms_perspective(
-      glm_rad(camera->fov),
+      glm_rad(camera->fieldOfView),
       swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
   ubo.proj.raw[1][1] *= -1;
 

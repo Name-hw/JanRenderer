@@ -39,8 +39,9 @@ pub const JrGuiViewModel = extern struct {
     CameraVelocity: *cglm.vec3s,
     CameraPitch: *f32,
     CameraYaw: *f32,
-    CameraFOV: *f32,
     CameraSpeed: *f32,
+    CameraFieldOfView: *f32,
+    CaemraIsRotatable: *bool,
 };
 
 pub const JrGui = extern struct {
@@ -278,13 +279,14 @@ pub export fn jrGui_newFrame(self: *JrGui, width: u32, height: u32, currentFrame
         //    // value0 has changed
         //}
 
-        if (zgui.collapsingHeader("Camera", .{})) {
+        if (zgui.collapsingHeader("Camera", .{ .default_open = true })) {
             _ = zgui.inputFloat3("Camera Position", .{ .v = &self.viewModel.CameraPosition.raw });
             _ = zgui.inputFloat3("Camera Velocity", .{ .v = &self.viewModel.CameraVelocity.raw });
             _ = zgui.inputFloat("Camera Pitch", .{ .v = self.viewModel.CameraPitch });
             _ = zgui.inputFloat("Camera Yaw", .{ .v = self.viewModel.CameraYaw });
-            _ = zgui.inputFloat("Camera FOV", .{ .v = self.viewModel.CameraFOV });
-            _ = zgui.sliderFloat("Camera Speed", .{ .v = self.viewModel.CameraSpeed, .min = 0.0, .max = 1.0 });
+            _ = zgui.sliderFloat("Camera Speed", .{ .v = self.viewModel.CameraSpeed, .min = 0.0, .max = 10.0 });
+            _ = zgui.inputFloat("Camera FieldOfView", .{ .v = self.viewModel.CameraFieldOfView });
+            _ = zgui.checkbox("Camera IsRotatable", .{ .v = self.viewModel.CaemraIsRotatable });
         }
 
         zgui.spacing();

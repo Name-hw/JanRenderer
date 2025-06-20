@@ -243,6 +243,9 @@ private:
   JrCamera *camera;
   JrGui *gui;
 
+  float deltaTime = 0.0f;       // Time between current frame and last frame
+  float timeOfLastFrame = 0.0f; // Time of last frame
+
   // helper functions
   void populateDebugMessengerCreateInfo(
       VkDebugUtilsMessengerCreateInfoEXT &createInfo);
@@ -371,6 +374,7 @@ private:
 
   // mainLoop
   void mainLoop();
+  void updateDeltaTime();
   void drawFrame();
   void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
   void recordComputeCommandBuffer(VkCommandBuffer commandBuffer);

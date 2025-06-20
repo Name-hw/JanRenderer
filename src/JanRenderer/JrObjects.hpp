@@ -11,16 +11,20 @@ struct JrCamera {
   float yaw;
 
   float speed;
-  float fov;
+  float fieldOfView;
+
+  bool isRotatable;
 };
 void jrCamera_init(JrCamera *);
 mat4s jrCamera_getRotationMatrix(JrCamera *);
 mat4s jrCamera_getViewMatrix(JrCamera *);
-void jrCamera_update(JrCamera *);
+void jrCamera_update(JrCamera *, float deltaTime);
 void jrCamera_keyCallback(GLFWwindow *window, int key, int scancode, int action,
                           int mods);
 void jrCamera_cursorPositionCallback(GLFWwindow *window, double xpos,
                                      double ypos);
+void jrCamera_mouseButtonCallback(GLFWwindow *window, int button, int action,
+                                  int mods);
 void jrCamera_scrollCallback(GLFWwindow *window, double xoffset,
                              double yoffset);
 
@@ -40,8 +44,9 @@ struct JrGuiViewModel {
   vec3s *CameraVelocity;
   float *CameraPitch;
   float *CameraYaw;
-  float *CameraFOV;
   float *CameraSpeed;
+  float *CameraFieldOfView;
+  bool *CameraIsRotatable;
 };
 
 struct JrGui {
