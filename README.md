@@ -15,8 +15,8 @@ Rendering engine built with Vulkan written in C++17 and Zig.
 
 ## **Getting Started**
 
-1. Link the glfw library.
-2. Import the built JanRenderer library and JanRenderer.zig. (see [this](https://github.com/Name-hw/JanRenderer/blob/main/src/TestApp/main.zig)).
+1. Link the JanRenderer, zglfw, zgui library (see [this](https://github.com/Name-hw/JanRenderer/blob/09737e3dbf671c098cf2e8e6a234f6afa62bbfa3/build.zig#L268)).
+2. Import JanRenderer.zig. (see [this](https://github.com/Name-hw/JanRenderer/blob/main/src/TestApp/main.zig)).
 
 ## **Build**
 
@@ -46,9 +46,9 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 2. Functions: camelCase
 3. Types (including objects, structs, enums, typedefs, etc): PascalCase
 4. Enums: PascalCase
-5. View (text displayed in GUI): Title Case
-6. ViewModel: PascalCase
-7. Abbreviations: Capitalized
+5. Views (texts displayed in GUI): Title Case
+6. ViewModels: PascalCase
+7. Initials: UPPERCASE
 
 ## **Dependencies**
 
