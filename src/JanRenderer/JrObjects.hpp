@@ -18,6 +18,7 @@ struct JrCamera {
 void jrCamera_init(JrCamera *);
 mat4s jrCamera_getRotationMatrix(JrCamera *);
 mat4s jrCamera_getViewMatrix(JrCamera *);
+mat4s jrCamera_getProjectionMatrix(JrCamera *, float aspectRatio);
 void jrCamera_update(JrCamera *, float deltaTime);
 void jrCamera_keyCallback(GLFWwindow *window, int key, int scancode, int action,
                           int mods);

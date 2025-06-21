@@ -53,6 +53,18 @@ pub export fn jrCamera_getViewMatrix(self: *JrCamera) callconv(.C) cglm.mat4s {
     return cglm.glms_mat4_make(&r);
 }
 
+pub export fn jrCamera_getProjectionMatrix(self: *JrCamera, aspectRatio: f32) callconv(.C) cglm.mat4s {
+    var cameraProjection: zmath.Mat = zmath.perspectiveFovRh(cglm.glm_rad(self.fieldOfView), aspectRatio, 0.001, 10000.0);
+
+    // invert the Y direction on projection matrix so that we are more similar
+    // to opengl and gltf axis
+    cameraProjection[1][1] *= -1;
+
+    const r = zmath.matToArr(cameraProjection);
+
+    return cglm.glms_mat4_make(&r);
+}
+
 pub export fn jrCamera_keyCallback(window: *zglfw.Window, key: zglfw.Key, scancode: c_int, action: zglfw.Action, mods: zglfw.Mods) callconv(.C) void {
     _ = scancode;
     _ = mods;
@@ -142,8 +154,8 @@ pub export fn jrCamera_scrollCallback(window: *zglfw.Window, xoffset: f64, yoffs
     const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with scroll callback");
     self.fieldOfView -= @floatCast(yoffset);
 
-    if (self.fieldOfView < 1) self.fieldOfView = 1;
-    if (self.fieldOfView > 180) self.fieldOfView = 180;
+    //if (self.fieldOfView < 1) self.fieldOfView = 1;
+    //if (self.fieldOfView > 180) self.fieldOfView = 180;
 }
 
 pub export fn jrCamera_update(self: *JrCamera, deltaTime: f32) callconv(.C) void {

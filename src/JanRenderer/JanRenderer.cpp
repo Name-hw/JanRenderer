@@ -2297,10 +2297,8 @@ void JanRenderer::updateUniformBuffer(uint32_t currentImage) {
   UniformBufferObject ubo{};
   ubo.model = GLMS_MAT4_IDENTITY;
   ubo.view = jrCamera_getViewMatrix(camera);
-  ubo.proj = glms_perspective(
-      glm_rad(camera->fieldOfView),
-      swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
-  ubo.proj.raw[1][1] *= -1;
+  ubo.proj = jrCamera_getProjectionMatrix(
+      camera, (float)(swapChainExtent.width / swapChainExtent.height));
 
   memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }
