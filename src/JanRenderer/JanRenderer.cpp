@@ -1,4 +1,4 @@
-#include <JanRenderer.hpp>
+#include <JanRenderer/JanRenderer.hpp>
 
 // stb
 #define STB_IMAGE_IMPLEMENTATION

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <common.hpp>
+#include <JanRenderer/common.hpp>
 
 extern "C" {
 struct JrCamera {

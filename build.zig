@@ -244,7 +244,6 @@ pub fn build(b: *std.Build) !void {
     });
     // JanRenderer_lib C source
     JanRenderer_lib.linkLibCpp();
-    JanRenderer_lib.addIncludePath(b.path("src/JanRenderer/"));
     JanRenderer_lib.addIncludePath(b.path("include/"));
     JanRenderer_lib.addCSourceFiles(.{ .root = b.path(""), .files = CSourceFiles, .flags = CFlags });
     // JanRenderer_lib vcpkg library
