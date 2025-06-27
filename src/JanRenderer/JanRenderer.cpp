@@ -66,7 +66,7 @@ void JanRenderer::run() {
   initJrObjects();
   initWindow();
   initVulkan();
-  initGui();
+  initJrObjectsAfterInitVulkan();
   mainLoop();
   cleanup();
 }
@@ -87,8 +87,9 @@ void JanRenderer::populateDebugMessengerCreateInfo(
   createInfo.pfnUserCallback = vkDebugCallback;
 }
 
-QueueFamily JanRenderer::getQueueFamily(VkPhysicalDevice physicalDevice_) {
-  QueueFamily queueFamily_;
+JrQueueFamilyIndices
+JanRenderer::getQueueFamilyIndices(VkPhysicalDevice physicalDevice_) {
+  JrQueueFamilyIndices indices;
 
   uint32_t queueFamilyCount = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice_, &queueFamilyCount,
@@ -102,11 +103,11 @@ QueueFamily JanRenderer::getQueueFamily(VkPhysicalDevice physicalDevice_) {
   for (const VkQueueFamilyProperties &queueFamilyProperty :
        queueFamilyProperties) {
     if (queueFamilyProperty.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-      queueFamily_.graphicsFamily = i;
+      indices.graphicsFamily = i;
     } else if (queueFamilyProperty.queueFlags & VK_QUEUE_COMPUTE_BIT) {
-      queueFamily_.computeFamily = i;
+      indices.computeFamily = i;
     } else if (queueFamilyProperty.queueFlags & VK_QUEUE_TRANSFER_BIT) {
-      queueFamily_.transferFamily = i;
+      indices.transferFamily = i;
     }
 
     VkBool32 presentSupport = false;
@@ -114,17 +115,17 @@ QueueFamily JanRenderer::getQueueFamily(VkPhysicalDevice physicalDevice_) {
                                          &presentSupport);
 
     if (presentSupport) {
-      queueFamily_.presentFamily = i;
+      indices.presentFamily = i;
     }
 
-    if (queueFamily_.isComplete()) {
+    if (jrQueueFamilyIndices_isComplete(&indices)) {
       break;
     }
 
     i++;
   }
 
-  return queueFamily_;
+  return indices;
 }
 
 uint32_t JanRenderer::findMemoryType(uint32_t typeFilter,
@@ -144,7 +145,7 @@ uint32_t JanRenderer::findMemoryType(uint32_t typeFilter,
 
 void JanRenderer::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
                                VkSharingMode sharingMode,
-                               uint32_t queueFamilyIndices[],
+                               uint32_t *queueFamilyIndices,
                                VkMemoryPropertyFlags properties,
                                VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
 
@@ -665,7 +666,7 @@ void JanRenderer::pickPhysicalDevice() {
     if (isDeviceSuitable(physicalDevice_)) {
       physicalDevice = physicalDevice_;
       msaaSamples = getMaxUsableSampleCount();
-      queueFamily = getQueueFamily(physicalDevice);
+      queueFamilyIndices = getQueueFamilyIndices(physicalDevice);
       break;
     }
   }
@@ -677,7 +678,7 @@ void JanRenderer::pickPhysicalDevice() {
 
 // initVulkan pickPhysicalDevice isDeviceSuitable
 bool JanRenderer::isDeviceSuitable(VkPhysicalDevice physicalDevice_) {
-  QueueFamily queueFamily_ = getQueueFamily(physicalDevice_);
+  JrQueueFamilyIndices indices = getQueueFamilyIndices(physicalDevice_);
 
   bool extensionsSupported = checkDeviceExtensionSupport(physicalDevice_);
 
@@ -692,7 +693,7 @@ bool JanRenderer::isDeviceSuitable(VkPhysicalDevice physicalDevice_) {
   VkPhysicalDeviceFeatures supportedFeatures;
   vkGetPhysicalDeviceFeatures(physicalDevice_, &supportedFeatures);
 
-  return queueFamily_.isComplete() && extensionsSupported &&
+  return jrQueueFamilyIndices_isComplete(&indices) && extensionsSupported &&
          swapChainAdequate && supportedFeatures.samplerAnisotropy;
 }
 
@@ -721,14 +722,14 @@ bool JanRenderer::checkDeviceExtensionSupport(
 void JanRenderer::createLogicalDevice() {
   std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
   std::set<uint32_t> uniqueQueueFamilies = {
-      queueFamily.graphicsFamily.value(), queueFamily.presentFamily.value(),
-      queueFamily.transferFamily.value(), queueFamily.computeFamily.value()};
+      queueFamilyIndices.graphicsFamily, queueFamilyIndices.presentFamily,
+      queueFamilyIndices.transferFamily, queueFamilyIndices.computeFamily};
 
   float queuePriority = 1.0f;
-  for (uint32_t queueFamily : uniqueQueueFamilies) {
+  for (uint32_t queueFamilyIndex : uniqueQueueFamilies) {
     VkDeviceQueueCreateInfo queueCreateInfo{};
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = queueFamily;
+    queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
     queueCreateInfo.queueCount = 1;
     queueCreateInfo.pQueuePriorities = &queuePriority;
     queueCreateInfos.push_back(queueCreateInfo);
@@ -764,12 +765,12 @@ void JanRenderer::createLogicalDevice() {
 
   volkLoadDevice(device);
 
-  vkGetDeviceQueue(device, queueFamily.graphicsFamily.value(), 0,
+  vkGetDeviceQueue(device, queueFamilyIndices.graphicsFamily, 0,
                    &graphicsQueue);
-  vkGetDeviceQueue(device, queueFamily.presentFamily.value(), 0, &presentQueue);
-  vkGetDeviceQueue(device, queueFamily.transferFamily.value(), 0,
+  vkGetDeviceQueue(device, queueFamilyIndices.presentFamily, 0, &presentQueue);
+  vkGetDeviceQueue(device, queueFamilyIndices.transferFamily, 0,
                    &transferQueue);
-  vkGetDeviceQueue(device, queueFamily.computeFamily.value(), 0, &computeQueue);
+  vkGetDeviceQueue(device, queueFamilyIndices.computeFamily, 0, &computeQueue);
 }
 
 // initVulkan createSwapChain
@@ -800,13 +801,13 @@ void JanRenderer::createSwapChain() {
   createInfo.imageArrayLayers = 1;
   createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-  uint32_t queueFamilyIndices[] = {queueFamily.graphicsFamily.value(),
-                                   queueFamily.presentFamily.value()};
+  uint32_t indices[] = {queueFamilyIndices.graphicsFamily,
+                        queueFamilyIndices.presentFamily};
 
-  if (queueFamily.graphicsFamily != queueFamily.presentFamily) {
+  if (queueFamilyIndices.graphicsFamily != queueFamilyIndices.presentFamily) {
     createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
     createInfo.queueFamilyIndexCount = 2;
-    createInfo.pQueueFamilyIndices = queueFamilyIndices;
+    createInfo.pQueueFamilyIndices = indices;
   } else {
     createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     createInfo.queueFamilyIndexCount = 0;     // Optional
@@ -1280,11 +1281,11 @@ void JanRenderer::createComputePipeline() {
 // initVulkan createCommandPools
 void JanRenderer::createCommandPools() {
   createCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                    queueFamily.graphicsFamily.value(), commandPool);
+                    queueFamilyIndices.graphicsFamily, commandPool);
   createCommandPool(VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
-                    queueFamily.transferFamily.value(), transferCommandPool);
+                    queueFamilyIndices.transferFamily, transferCommandPool);
   createCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                    queueFamily.computeFamily.value(), computeCommandPool);
+                    queueFamilyIndices.computeFamily, computeCommandPool);
 }
 
 // initVulkan createColorResources
@@ -1388,12 +1389,12 @@ void JanRenderer::createTextureImage() {
                   std::floor(std::log2(std::max(texWidth, texHeight)))) +
               1;
 
-  uint32_t queueFamilyIndices[] = {queueFamily.graphicsFamily.value(),
-                                   queueFamily.transferFamily.value()};
+  uint32_t indices[] = {queueFamilyIndices.graphicsFamily,
+                        queueFamilyIndices.transferFamily};
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingBufferMemory;
   createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-               VK_SHARING_MODE_CONCURRENT, queueFamilyIndices,
+               VK_SHARING_MODE_CONCURRENT, indices,
                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                stagingBuffer, stagingBufferMemory);
@@ -1659,12 +1660,12 @@ void JanRenderer::loadModel() {
 void JanRenderer::createVertexBuffer() {
   VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
-  uint32_t queueFamilyIndices[] = {queueFamily.graphicsFamily.value(),
-                                   queueFamily.transferFamily.value()};
+  uint32_t indices[] = {queueFamilyIndices.graphicsFamily,
+                        queueFamilyIndices.transferFamily};
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingBufferMemory;
   createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-               VK_SHARING_MODE_CONCURRENT, queueFamilyIndices,
+               VK_SHARING_MODE_CONCURRENT, indices,
                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                stagingBuffer, stagingBufferMemory);
@@ -1677,8 +1678,8 @@ void JanRenderer::createVertexBuffer() {
   createBuffer(
       bufferSize,
       VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-      VK_SHARING_MODE_CONCURRENT, queueFamilyIndices,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+      VK_SHARING_MODE_CONCURRENT, indices, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+      vertexBuffer, vertexBufferMemory);
 
   copyBuffer(transferQueue, transferCommandPool, stagingBuffer, vertexBuffer,
              bufferSize);
@@ -1691,12 +1692,12 @@ void JanRenderer::createVertexBuffer() {
 void JanRenderer::createIndexBuffer() {
   VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
-  uint32_t queueFamilyIndices[] = {queueFamily.graphicsFamily.value(),
-                                   queueFamily.transferFamily.value()};
+  uint32_t queueFamilyIndices_[] = {queueFamilyIndices.graphicsFamily,
+                                    queueFamilyIndices.transferFamily};
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingBufferMemory;
   createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-               VK_SHARING_MODE_CONCURRENT, queueFamilyIndices,
+               VK_SHARING_MODE_CONCURRENT, queueFamilyIndices_,
                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                stagingBuffer, stagingBufferMemory);
@@ -1709,7 +1710,7 @@ void JanRenderer::createIndexBuffer() {
   createBuffer(
       bufferSize,
       VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-      VK_SHARING_MODE_CONCURRENT, queueFamilyIndices,
+      VK_SHARING_MODE_CONCURRENT, queueFamilyIndices_,
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
 
   copyBuffer(transferQueue, transferCommandPool, stagingBuffer, indexBuffer,
@@ -1728,9 +1729,9 @@ void JanRenderer::createUniformBuffers() {
   uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    uint32_t queueFamilyIndices[] = {queueFamily.graphicsFamily.value()};
+    uint32_t indices[] = {queueFamilyIndices.graphicsFamily};
     createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                 VK_SHARING_MODE_EXCLUSIVE, queueFamilyIndices,
+                 VK_SHARING_MODE_EXCLUSIVE, indices,
                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                  uniformBuffers[i], uniformBuffersMemory[i]);
@@ -1848,14 +1849,14 @@ void JanRenderer::createShaderStorageBuffers() {
 
   VkDeviceSize bufferSize = sizeof(Particle) * PARTICLE_COUNT;
 
-  uint32_t queueFamilyIndices[] = {
-      queueFamily.computeFamily.value(),
-      queueFamily.transferFamily.value(),
+  uint32_t indices[] = {
+      queueFamilyIndices.computeFamily,
+      queueFamilyIndices.transferFamily,
   };
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingBufferMemory;
   createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-               VK_SHARING_MODE_CONCURRENT, queueFamilyIndices,
+               VK_SHARING_MODE_CONCURRENT, indices,
                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                stagingBuffer, stagingBufferMemory);
@@ -1869,13 +1870,12 @@ void JanRenderer::createShaderStorageBuffers() {
   shaderStorageBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    createBuffer(bufferSize,
-                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                     VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                 VK_SHARING_MODE_EXCLUSIVE, queueFamilyIndices,
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, shaderStorageBuffers[i],
-                 shaderStorageBuffersMemory[i]);
+    createBuffer(
+        bufferSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_SHARING_MODE_EXCLUSIVE, indices, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        shaderStorageBuffers[i], shaderStorageBuffersMemory[i]);
     // Copy data from the staging buffer (host) to the shader storage buffer
     // (GPU)
     copyBuffer(computeQueue, computeCommandPool, stagingBuffer,
@@ -2023,15 +2023,28 @@ void JanRenderer::createSyncObjects() {
   }
 }
 
-// initGui
-void JanRenderer::initGui() {
-  ImGui_ImplVulkan_InitInfo initInfo{};
-  initInfo.Instance = instance;
-  initInfo.PhysicalDevice = physicalDevice;
-  initInfo.MinImageCount = 3;
-  initInfo.ImageCount = 3;
-  initInfo.MinAllocationSize = 1024 * 1024;
+// initJrObjectsAfterInitVulkan
+void JanRenderer::initJrObjectsAfterInitVulkan() {
+  vulkanCtx = new JrVulkanContext;
+  vulkanCtx->instance = &instance;
+  vulkanCtx->physicalDevice = &physicalDevice;
+  vulkanCtx->device = &device;
+  vulkanCtx->queueFamilyIndices = &queueFamilyIndices;
+  vulkanCtx->graphicsQueue = &graphicsQueue;
+  vulkanCtx->presentQueue = &presentQueue;
+  vulkanCtx->transferQueue = &transferQueue;
+  vulkanCtx->computeQueue = &computeQueue;
+  vulkanCtx->swapChain = &swapChain;
+  vulkanCtx->swapChainFormat = &swapChainImageFormat;
+  vulkanCtx->swapChainExtent = &swapChainExtent;
+  vulkanCtx->swapChainImageViews = swapChainImageViews.data();
+  vulkanCtx->renderPass = &renderPass;
 
+  initGui();
+}
+
+// initJrClassesAfterInitVulkan initGui
+void JanRenderer::initGui() {
   JrGuiViewModel *guiViewModel = new JrGuiViewModel;
   guiViewModel->CameraPosition = &camera->position;
   guiViewModel->CameraVelocity = &camera->velocity;
@@ -2042,15 +2055,9 @@ void JanRenderer::initGui() {
   guiViewModel->CameraIsRotatable = &camera->isRotatable;
 
   gui = new JrGui;
-  gui->device = device;
-  gui->queueFamilyIndex = queueFamily.graphicsFamily.value();
-  gui->queue = graphicsQueue;
-  gui->swapChainImageFormat = swapChainImageFormat;
-  gui->swapChainExtent = swapChainExtent;
-  gui->swapChainImageViews = swapChainImageViews.data();
+  gui->vulkanCtx = vulkanCtx;
   gui->msaaSamples = VK_SAMPLE_COUNT_1_BIT;
   gui->window = window;
-  gui->initInfo = initInfo;
   gui->viewModel = guiViewModel;
 
   jrGui_init(gui);

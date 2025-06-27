@@ -3,6 +3,35 @@
 #include <JanRenderer/common.hpp>
 
 extern "C" {
+struct JrQueueFamilyIndices {
+  uint32_t graphicsFamily;
+  uint32_t presentFamily;
+  uint32_t transferFamily;
+  uint32_t computeFamily;
+};
+bool jrQueueFamilyIndices_isComplete(JrQueueFamilyIndices *);
+
+struct JrVulkanContext {
+  VkInstance *instance;
+
+  VkPhysicalDevice *physicalDevice;
+  VkDevice *device;
+
+  JrQueueFamilyIndices *queueFamilyIndices;
+  VkQueue *graphicsQueue;
+  VkQueue *presentQueue;
+  VkQueue *transferQueue;
+  VkQueue *computeQueue;
+
+  VkSwapchainKHR *swapChain;
+  VkImage *swapChainImages;
+  VkFormat *swapChainFormat;
+  VkExtent2D *swapChainExtent;
+  VkImageView *swapChainImageViews;
+
+  VkRenderPass *renderPass;
+};
+
 struct JrCamera {
   vec3s position;
   vec3s velocity;
@@ -51,20 +80,15 @@ struct JrGuiViewModel {
 };
 
 struct JrGui {
-  VkDevice device;
-  uint32_t queueFamilyIndex;
-  VkQueue queue;
-  VkFormat swapChainImageFormat;
-  VkExtent2D swapChainExtent;
-  VkImageView *swapChainImageViews;
+  JrVulkanContext *vulkanCtx;
   VkFramebuffer swapChainFramebuffers[3];
   VkRenderPass renderPass;
   VkCommandPool commandPool;
   VkCommandBuffer commandBuffers[3];
   VkSemaphore renderFinishedSemaphores[3];
   VkDescriptorPool descriptorPool;
-  uint32_t currentFrame;
   VkSampleCountFlagBits msaaSamples;
+  uint32_t currentFrame;
   GLFWwindow *window;
   ImGui_ImplVulkan_InitInfo initInfo;
   void *fontSet;
