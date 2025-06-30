@@ -6,17 +6,17 @@
 
 #include "common.hpp"
 
-struct QueueFamily {
-  std::optional<uint32_t> graphicsFamily;
-  std::optional<uint32_t> presentFamily;
-  std::optional<uint32_t> transferFamily;
-  std::optional<uint32_t> computeFamily;
+// struct QueueFamilyIndices {
+//   std::optional<uint32_t> graphicsFamily;
+//   std::optional<uint32_t> presentFamily;
+//   std::optional<uint32_t> transferFamily;
+//   std::optional<uint32_t> computeFamily;
 
-  bool isComplete() {
-    return graphicsFamily.has_value() && presentFamily.has_value() &&
-           transferFamily.has_value() && computeFamily.has_value();
-  }
-};
+//  bool isComplete() {
+//    return graphicsFamily.has_value() && presentFamily.has_value() &&
+//           transferFamily.has_value() && computeFamily.has_value();
+//  }
+//};
 
 struct SwapChainSupportDetails {
   VkSurfaceCapabilitiesKHR capabilities;
@@ -162,7 +162,7 @@ private:
   VkDevice device;
 
   // queue
-  QueueFamily queueFamily;
+  JrQueueFamilyIndices queueFamilyIndices;
   VkQueue graphicsQueue;
   VkQueue presentQueue;
   VkQueue transferQueue;
@@ -240,6 +240,7 @@ private:
   std::vector<VkDeviceMemory> shaderStorageBuffersMemory;
 
   // HMODULE JrClasses_lib; dynamic loading of JrClasses library (old way)
+  JrVulkanContext *vulkanCtx;
   JrCamera *camera;
   JrGui *gui;
 
@@ -267,7 +268,7 @@ private:
 
     return VK_FALSE;
   }
-  QueueFamily getQueueFamily(VkPhysicalDevice physicalDevice_);
+  JrQueueFamilyIndices getQueueFamilyIndices(VkPhysicalDevice physicalDevice_);
   uint32_t findMemoryType(uint32_t typeFilter,
                           VkMemoryPropertyFlags properties);
   void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
@@ -369,7 +370,8 @@ private:
 
   void createSyncObjects();
 
-  // initGui
+  // initJrObjectsAfterInitVulkan
+  void initJrObjectsAfterInitVulkan();
   void initGui();
 
   // mainLoop

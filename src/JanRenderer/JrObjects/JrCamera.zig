@@ -68,7 +68,7 @@ pub export fn jrCamera_getProjectionMatrix(self: *JrCamera, aspectRatio: f32) ca
 pub export fn jrCamera_keyCallback(window: *zglfw.Window, key: zglfw.Key, scancode: c_int, action: zglfw.Action, mods: zglfw.Mods) callconv(.C) void {
     _ = scancode;
     _ = mods;
-    const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with key callback");
+    const self = zglfw.getWindowUserPointer(window, common.JrGlfwUserPointer).?.camera orelse @panic("Problem with key callback");
 
     if (action == zglfw.Action.press) {
         if (key == zglfw.Key.w) {
@@ -106,7 +106,7 @@ pub export fn jrCamera_keyCallback(window: *zglfw.Window, key: zglfw.Key, scanco
 //}
 
 pub export fn jrCamera_cursorPositionCallback(window: *zglfw.Window, xpos: f64, ypos: f64) callconv(.C) void {
-    const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with cursor position callback");
+    const self = zglfw.getWindowUserPointer(window, common.JrGlfwUserPointer).?.camera orelse @panic("Problem with cursor position callback");
     const static = struct {
         var firstMouse: bool = true;
         var lastXpos: f64 = 0;
@@ -138,7 +138,7 @@ pub export fn jrCamera_cursorPositionCallback(window: *zglfw.Window, xpos: f64, 
 
 pub export fn jrCamera_mouseButtonCallback(window: *zglfw.Window, button: zglfw.MouseButton, action: zglfw.Action, mods: zglfw.Mods) callconv(.C) void {
     _ = mods;
-    const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with mouse button callback");
+    const self = zglfw.getWindowUserPointer(window, common.JrGlfwUserPointer).?.camera orelse @panic("Problem with mouse button callback");
 
     if (button == zglfw.MouseButton.right) {
         if (action == zglfw.Action.press) {
@@ -151,7 +151,7 @@ pub export fn jrCamera_mouseButtonCallback(window: *zglfw.Window, button: zglfw.
 
 pub export fn jrCamera_scrollCallback(window: *zglfw.Window, xoffset: f64, yoffset: f64) callconv(.C) void {
     _ = xoffset;
-    const self = zglfw.getWindowUserPointer(window, common.GlfwUserPointer).?.camera orelse @panic("Problem with scroll callback");
+    const self = zglfw.getWindowUserPointer(window, common.JrGlfwUserPointer).?.camera orelse @panic("Problem with scroll callback");
     self.fieldOfView -= @floatCast(yoffset);
 
     //if (self.fieldOfView < 1) self.fieldOfView = 1;
