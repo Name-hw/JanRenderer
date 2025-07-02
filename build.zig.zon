@@ -33,8 +33,8 @@
             .hash = "zglfw-0.10.0-dev-zgVDNN6bIQDOl1vEb15vC3PJ1Nrg8cP1m3DFJlDOzhgd",
         },
         .zgui = .{
-            .url = "git+https://github.com/zig-gamedev/zgui#21dcc288ac5ee70b1fca789d53a06d5c49d51e5e",
-            .hash = "zgui-0.6.0-dev--L6sZKTBaADLHp09LtUUifdfFpsczwbnyH7r2ajfVPuJ",
+            .url = "git+https://github.com/zig-gamedev/zgui#b2f29f14bce688ec90a26a9a7906543d98e0f8a0",
+            .hash = "zgui-0.6.0-dev--L6sZBDaaAAs88V6Y7ALQ_OU1KHG88hUYlKlrJdMEGsD",
         },
     },
     .paths = .{
