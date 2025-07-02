@@ -6,7 +6,7 @@ const mem = std.mem;
 const ArrayList = std.ArrayList;
 
 const CSourceFiles: []const []const u8 =
-    &.{"src/JanRenderer/JanRenderer.cpp"};
+    &.{ "JanRenderer.cpp", "VolkUsage.cpp" };
 const CFlags: []const []const u8 = &.{"-std=c++17"};
 
 const ZigLibs = struct {
@@ -245,7 +245,7 @@ pub fn build(b: *std.Build) !void {
     // JanRenderer_lib C source
     JanRenderer_lib.linkLibCpp();
     JanRenderer_lib.addIncludePath(b.path("include/"));
-    JanRenderer_lib.addCSourceFiles(.{ .root = b.path(""), .files = CSourceFiles, .flags = CFlags });
+    JanRenderer_lib.addCSourceFiles(.{ .root = b.path("src/JanRenderer/"), .files = CSourceFiles, .flags = CFlags });
     // JanRenderer_lib vcpkg library
     JanRenderer_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
     JanRenderer_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
