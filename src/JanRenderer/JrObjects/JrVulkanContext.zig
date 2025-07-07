@@ -1,30 +1,27 @@
 const std = @import("std");
-const volk = @cImport({
-    @cInclude("volk.h");
-});
-const cglm = @cImport({
-    @cDefine("CGLM_FORCE_DEPTH_ZERO_TO_ONE", "");
-    @cInclude("cglm/struct.h");
-});
+const common = @import("common.zig");
+const c = common.c;
 const JrQueueFamilyIndices = @import("JrQueueFamilyIndices.zig");
 
 const Self = @This();
 
-instance: *volk.VkInstance,
+instance: *c.VkInstance,
 
-physicalDevice: *volk.VkPhysicalDevice,
-device: *volk.VkDevice,
+physicalDevice: *c.VkPhysicalDevice,
+device: *c.VkDevice,
 
 queueFamilyIndices: *JrQueueFamilyIndices,
-graphics_queue: *volk.VkQueue,
-present_queue: *volk.VkQueue,
-transfer_queue: *volk.VkQueue,
-compute_queue: *volk.VkQueue,
+graphics_queue: *c.VkQueue,
+present_queue: *c.VkQueue,
+transfer_queue: *c.VkQueue,
+compute_queue: *c.VkQueue,
 
-swapchain: *volk.VkSwapchainKHR,
-swapchain_images: *[3]volk.VkImage,
-swapchain_format: *volk.VkFormat,
-swapchain_extent: *volk.VkExtent2D,
-swapchain_imageViews: *[3]volk.VkImageView,
+swapchain: *c.VkSwapchainKHR,
+swapchain_images: *[3]c.VkImage,
+swapchain_format: *c.VkFormat,
+swapchain_extent: *c.VkExtent2D,
+swapchain_imageViews: *[3]c.VkImageView,
 
-renderPass: *volk.VkRenderPass,
+renderPass: *c.VkRenderPass,
+
+vma_allocator: *c.VmaAllocator,

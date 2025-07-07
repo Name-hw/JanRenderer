@@ -1,15 +1,9 @@
 const std = @import("std");
-const volk = @cImport({
-    @cInclude("volk.h");
-});
-const cglm = @cImport({
-    @cDefine("CGLM_FORCE_DEPTH_ZERO_TO_ONE", "");
-    @cInclude("cglm/struct.h");
-});
 const zmath = @import("zmath");
 const zglfw = @import("zglfw");
 const zgui = @import("zgui");
 const common = @import("common.zig");
+const c = common.c;
 const JrVulkanContext = @import("JrVulkanContext.zig");
 const allocator = std.heap.c_allocator;
 
@@ -37,8 +31,8 @@ pub const FontSet = struct {
 
 // MVVM pattern
 pub const JrGuiViewModel = extern struct {
-    CameraPosition: *cglm.vec3s,
-    CameraVelocity: *cglm.vec3s,
+    CameraPosition: *c.vec3s,
+    CameraVelocity: *c.vec3s,
     CameraPitch: *f32,
     CameraYaw: *f32,
     CameraSpeed: *f32,
@@ -46,24 +40,24 @@ pub const JrGuiViewModel = extern struct {
     CaemraIsRotatable: *bool,
 };
 
-pub const JrGui = extern struct {
-    vulkan_ctx: *JrVulkanContext,
-    swapChainFramebuffers: [3]volk.VkFramebuffer,
-    renderPass: volk.VkRenderPass,
-    //pipeline: volk.VkPipeline,
-    //pipelineLayout: volk.VkPipelineLayout,
-    commandPool: volk.VkCommandPool,
-    commandBuffers: [3]volk.VkCommandBuffer,
-    renderFinishedSemaphores: [3]volk.VkSemaphore,
-    descriptorPool: volk.VkDescriptorPool,
-    msaaSamples: volk.VkSampleCountFlagBits,
-    currentFrame: u32,
-    window: *zglfw.Window,
-    initInfo: zgui.backend.ImGui_ImplVulkan_InitInfo,
-    fontSet: *FontSet,
-    style: *zgui.Style,
-    viewModel: *JrGuiViewModel,
-};
+const Self = @This();
+
+vulkan_ctx: *JrVulkanContext,
+swapChainFramebuffers: [3]c.VkFramebuffer,
+renderPass: c.VkRenderPass,
+//pipeline: c.VkPipeline,
+//pipelineLayout: c.VkPipelineLayout,
+commandPool: c.VkCommandPool,
+commandBuffers: [3]c.VkCommandBuffer,
+renderFinishedSemaphores: [3]c.VkSemaphore,
+descriptorPool: c.VkDescriptorPool,
+msaaSamples: c.VkSampleCountFlagBits,
+currentFrame: u32,
+window: *zglfw.Window,
+initInfo: zgui.backend.ImGui_ImplVulkan_InitInfo,
+fontSet: *FontSet,
+style: *zgui.Style,
+viewModel: *JrGuiViewModel,
 
 // Will use this in other code
 //pub const MessageType = enum { Print, Warning, Error };
@@ -78,12 +72,12 @@ pub const JrGui = extern struct {
 //    }
 //}
 
-pub export fn jrGui_init(self: *JrGui) callconv(.C) void {
+pub fn init(self: *Self) void {
     createGuiRenderPass(self);
     createFramebuffers(self);
     createDescriptorPool(self);
     createCommandPool(self);
-    allocateCommandBuffer(self, volk.VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+    allocateCommandBuffer(self, c.VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     createSyncObjects(self);
 
     self.initInfo = zgui.backend.ImGui_ImplVulkan_InitInfo{
@@ -126,57 +120,57 @@ pub export fn jrGui_init(self: *JrGui) callconv(.C) void {
     zgui.io.setDefaultFont(self.fontSet.regular);
 }
 
-pub export fn checkVkResult(err: u32) callconv(.C) void {
-    if (err != volk.VK_SUCCESS) @panic("Imgui error!");
+pub fn checkVkResult(err: u32) callconv(.C) void {
+    if (err != c.VK_SUCCESS) @panic("Imgui error!");
 }
 
-pub fn createDescriptorPool(self: *JrGui) void {
-    const poolSizes = [_]volk.VkDescriptorPoolSize{
-        .{ .type = volk.VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 1000 },
-        .{ .type = volk.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1000 },
-        .{ .type = volk.VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 1000 },
-        .{ .type = volk.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1000 },
-        .{ .type = volk.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, .descriptorCount = 1000 },
-        .{ .type = volk.VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, .descriptorCount = 1000 },
-        .{ .type = volk.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1000 },
-        .{ .type = volk.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1000 },
-        .{ .type = volk.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .descriptorCount = 1000 },
-        .{ .type = volk.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, .descriptorCount = 1000 },
-        .{ .type = volk.VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = 1000 },
+pub fn createDescriptorPool(self: *Self) void {
+    const poolSizes = [_]c.VkDescriptorPoolSize{
+        .{ .type = c.VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 1000 },
+        .{ .type = c.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1000 },
+        .{ .type = c.VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 1000 },
+        .{ .type = c.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1000 },
+        .{ .type = c.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, .descriptorCount = 1000 },
+        .{ .type = c.VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, .descriptorCount = 1000 },
+        .{ .type = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1000 },
+        .{ .type = c.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1000 },
+        .{ .type = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .descriptorCount = 1000 },
+        .{ .type = c.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, .descriptorCount = 1000 },
+        .{ .type = c.VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = 1000 },
     };
-    const poolInfo = volk.VkDescriptorPoolCreateInfo{
-        .sType = volk.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .flags = volk.VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+    const poolInfo = c.VkDescriptorPoolCreateInfo{
+        .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .flags = c.VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
         .maxSets = 1000,
         .poolSizeCount = poolSizes.len,
         .pPoolSizes = &poolSizes,
     };
 
-    if (volk.vkCreateDescriptorPool.?(self.vulkan_ctx.device.*, &poolInfo, null, &self.descriptorPool) != volk.VK_SUCCESS) {
+    if (c.vkCreateDescriptorPool.?(self.vulkan_ctx.device.*, &poolInfo, null, &self.descriptorPool) != c.VK_SUCCESS) {
         @panic("Failed to create descriptor pool!");
     }
 }
 
-pub fn createGuiRenderPass(self: *JrGui) void {
-    const colorAttachment = volk.VkAttachmentDescription{
+pub fn createGuiRenderPass(self: *Self) void {
+    const colorAttachment = c.VkAttachmentDescription{
         .format = self.vulkan_ctx.swapchain_format.*,
         .samples = self.msaaSamples,
-        .loadOp = volk.VK_ATTACHMENT_LOAD_OP_LOAD,
-        .storeOp = volk.VK_ATTACHMENT_STORE_OP_STORE,
-        .stencilLoadOp = volk.VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        .stencilStoreOp = volk.VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        .initialLayout = volk.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .finalLayout = volk.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        .loadOp = c.VK_ATTACHMENT_LOAD_OP_LOAD,
+        .storeOp = c.VK_ATTACHMENT_STORE_OP_STORE,
+        .stencilLoadOp = c.VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .stencilStoreOp = c.VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        .initialLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .finalLayout = c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         .flags = 0,
     };
 
-    const colorAttachmentRef = volk.VkAttachmentReference{
+    const colorAttachmentRef = c.VkAttachmentReference{
         .attachment = 0,
-        .layout = volk.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .layout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     };
 
-    const subpass = volk.VkSubpassDescription{
-        .pipelineBindPoint = volk.VK_PIPELINE_BIND_POINT_GRAPHICS,
+    const subpass = c.VkSubpassDescription{
+        .pipelineBindPoint = c.VK_PIPELINE_BIND_POINT_GRAPHICS,
         .colorAttachmentCount = 1,
         .pColorAttachments = &colorAttachmentRef,
         .inputAttachmentCount = 0,
@@ -188,18 +182,18 @@ pub fn createGuiRenderPass(self: *JrGui) void {
         .flags = 0,
     };
 
-    const dependency = volk.VkSubpassDependency{
-        .srcSubpass = volk.VK_SUBPASS_EXTERNAL,
+    const dependency = c.VkSubpassDependency{
+        .srcSubpass = c.VK_SUBPASS_EXTERNAL,
         .dstSubpass = 0,
-        .srcStageMask = volk.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        .dstStageMask = volk.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .srcStageMask = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .dstStageMask = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         .srcAccessMask = 0,
-        .dstAccessMask = volk.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .dependencyFlags = 0,
     };
 
-    const renderPassInfo = volk.VkRenderPassCreateInfo{
-        .sType = volk.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+    const renderPassInfo = c.VkRenderPassCreateInfo{
+        .sType = c.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         .pNext = null,
         .flags = 0,
         .attachmentCount = 1,
@@ -210,15 +204,15 @@ pub fn createGuiRenderPass(self: *JrGui) void {
         .pDependencies = &dependency,
     };
 
-    if (volk.vkCreateRenderPass.?(self.vulkan_ctx.device.*, &renderPassInfo, null, &self.renderPass) != volk.VK_SUCCESS) {
+    if (c.vkCreateRenderPass.?(self.vulkan_ctx.device.*, &renderPassInfo, null, &self.renderPass) != c.VK_SUCCESS) {
         @panic("Failed to create gui render pass!");
     }
 }
 
-pub fn createFramebuffers(self: *JrGui) void {
+pub fn createFramebuffers(self: *Self) void {
     for (self.vulkan_ctx.swapchain_imageViews.*, 0..) |swapChainImageView, i| {
-        const framebufferInfo = volk.VkFramebufferCreateInfo{
-            .sType = volk.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+        const framebufferInfo = c.VkFramebufferCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
             .renderPass = self.renderPass,
             .attachmentCount = 1,
             .pAttachments = &swapChainImageView,
@@ -227,52 +221,52 @@ pub fn createFramebuffers(self: *JrGui) void {
             .layers = 1,
         };
 
-        if (volk.vkCreateFramebuffer.?(self.vulkan_ctx.device.*, &framebufferInfo, null, &self.swapChainFramebuffers[i]) != volk.VK_SUCCESS) {
+        if (c.vkCreateFramebuffer.?(self.vulkan_ctx.device.*, &framebufferInfo, null, &self.swapChainFramebuffers[i]) != c.VK_SUCCESS) {
             @panic("Failed to create framebuffer!");
         }
     }
 }
 
-pub fn createCommandPool(self: *JrGui) void {
-    const poolInfo = volk.VkCommandPoolCreateInfo{
-        .sType = volk.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+pub fn createCommandPool(self: *Self) void {
+    const poolInfo = c.VkCommandPoolCreateInfo{
+        .sType = c.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .pNext = null,
-        .flags = volk.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .flags = c.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         .queueFamilyIndex = self.vulkan_ctx.queueFamilyIndices.graphics_family.?,
     };
 
-    if (volk.vkCreateCommandPool.?(self.vulkan_ctx.device.*, &poolInfo, null, &self.commandPool) != volk.VK_SUCCESS) {
+    if (c.vkCreateCommandPool.?(self.vulkan_ctx.device.*, &poolInfo, null, &self.commandPool) != c.VK_SUCCESS) {
         @panic("Failed to create command pool!");
     }
 }
 
-pub fn allocateCommandBuffer(self: *JrGui, level: volk.VkCommandBufferLevel) void {
-    var allocInfo = volk.VkCommandBufferAllocateInfo{
-        .sType = volk.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+pub fn allocateCommandBuffer(self: *Self, level: c.VkCommandBufferLevel) void {
+    var allocInfo = c.VkCommandBufferAllocateInfo{
+        .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .pNext = null,
         .commandPool = self.commandPool,
         .level = level,
         .commandBufferCount = 3,
     };
 
-    if (volk.vkAllocateCommandBuffers.?(self.vulkan_ctx.device.*, &allocInfo, &self.commandBuffers) != volk.VK_SUCCESS) {
+    if (c.vkAllocateCommandBuffers.?(self.vulkan_ctx.device.*, &allocInfo, &self.commandBuffers) != c.VK_SUCCESS) {
         @panic("Failed to allocate command buffer!");
     }
 }
 
-pub fn createSyncObjects(self: *JrGui) void {
-    var semaphoreInfo = volk.VkSemaphoreCreateInfo{
-        .sType = volk.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+pub fn createSyncObjects(self: *Self) void {
+    var semaphoreInfo = c.VkSemaphoreCreateInfo{
+        .sType = c.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
     };
 
     for (0..3) |i| {
-        if (volk.vkCreateSemaphore.?(self.vulkan_ctx.device.*, &semaphoreInfo, null, &self.renderFinishedSemaphores[i]) != volk.VK_SUCCESS) {
+        if (c.vkCreateSemaphore.?(self.vulkan_ctx.device.*, &semaphoreInfo, null, &self.renderFinishedSemaphores[i]) != c.VK_SUCCESS) {
             @panic("Failed to create synchronization objects for a frame!");
         }
     }
 }
 
-pub export fn jrGui_newFrame(self: *JrGui, width: u32, height: u32, currentFrame: u32) callconv(.C) void {
+pub fn newFrame(self: *Self, width: u32, height: u32, currentFrame: u32) void {
     self.currentFrame = currentFrame;
     zgui.backend.newFrame(width, height);
 
@@ -307,14 +301,14 @@ pub export fn jrGui_newFrame(self: *JrGui, width: u32, height: u32, currentFrame
     zgui.showDemoWindow(null);
 }
 
-//pub export fn jrGui_setupDockSpace(self: *JrGui) callconv(.C) void {
+//pub fn setupDockSpace(self: *Self) void {
 //    _ = self;
 //    const dockNodeFlags = zgui.DockNodeFlags{};
 //    const dockSpace = zgui.DockSpaceOverViewport(zgui.getMainViewport().getId(), zgui.getMainViewport(), dockNodeFlags);
 //    _ = dockSpace;
 //}
 
-pub export fn jrGui_recreateSwapChain(self: *JrGui, swapChainImageFormat_: volk.VkFormat, swapChainExtent_: volk.VkExtent2D, swapChainImageViews_: *[3]volk.VkImageView) callconv(.C) void {
+pub fn recreateSwapchain(self: *Self, swapChainImageFormat_: c.VkFormat, swapChainExtent_: c.VkExtent2D, swapChainImageViews_: *[3]c.VkImageView) void {
     self.vulkan_ctx.swapchain_format.* = swapChainImageFormat_;
     self.vulkan_ctx.swapchain_extent.* = swapChainExtent_;
     self.vulkan_ctx.swapchain_imageViews = swapChainImageViews_;
@@ -323,17 +317,17 @@ pub export fn jrGui_recreateSwapChain(self: *JrGui, swapChainImageFormat_: volk.
     createFramebuffers(self);
 }
 
-pub export fn jrGui_render(self: *JrGui, imageIndex: u32, waitSemaphoreCount: u32, pWaitSemaphores: *volk.VkSemaphore, fence: volk.VkFence) callconv(.C) void {
-    _ = volk.vkResetCommandBuffer.?(self.commandBuffers[self.currentFrame], 0);
+pub fn render(self: *Self, imageIndex: u32, waitSemaphoreCount: u32, pWaitSemaphores: *c.VkSemaphore, fence: c.VkFence) void {
+    _ = c.vkResetCommandBuffer.?(self.commandBuffers[self.currentFrame], 0);
 
     recordCommandBuffer(self, imageIndex);
 
-    const waitStages = [_]volk.VkPipelineStageFlags{
-        volk.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    const waitStages = [_]c.VkPipelineStageFlags{
+        c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     };
 
-    var submitInfo = volk.VkSubmitInfo{
-        .sType = volk.VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    var submitInfo = c.VkSubmitInfo{
+        .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .waitSemaphoreCount = waitSemaphoreCount,
         .pWaitSemaphores = pWaitSemaphores,
         .pWaitDstStageMask = &waitStages,
@@ -343,32 +337,32 @@ pub export fn jrGui_render(self: *JrGui, imageIndex: u32, waitSemaphoreCount: u3
         .pSignalSemaphores = &self.renderFinishedSemaphores[self.currentFrame],
     };
 
-    if (volk.vkQueueSubmit.?(self.vulkan_ctx.graphics_queue.*, 1, &submitInfo, fence) != volk.VK_SUCCESS) {
+    if (c.vkQueueSubmit.?(self.vulkan_ctx.graphics_queue.*, 1, &submitInfo, fence) != c.VK_SUCCESS) {
         @panic("Failed to submit gui command buffer!");
     }
 
-    _ = volk.vkQueueWaitIdle.?(self.vulkan_ctx.graphics_queue.*);
+    _ = c.vkQueueWaitIdle.?(self.vulkan_ctx.graphics_queue.*);
 
     zgui.updatePlatformWindows();
     zgui.renderPlatformWindowsDefault();
 }
 
-pub fn recordCommandBuffer(self: *JrGui, imageIndex: u32) void {
-    var beginInfo = volk.VkCommandBufferBeginInfo{
-        .sType = volk.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+pub fn recordCommandBuffer(self: *Self, imageIndex: u32) void {
+    var beginInfo = c.VkCommandBufferBeginInfo{
+        .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = 0,
         .pInheritanceInfo = null,
     };
-    if (volk.vkBeginCommandBuffer.?(self.commandBuffers[self.currentFrame], &beginInfo) != volk.VK_SUCCESS) {
+    if (c.vkBeginCommandBuffer.?(self.commandBuffers[self.currentFrame], &beginInfo) != c.VK_SUCCESS) {
         @panic("Failed to begin recording gui command buffer!");
     }
 
-    var clearValues = [_]volk.VkClearValue{
+    var clearValues = [_]c.VkClearValue{
         .{ .color = .{ .uint32 = [4]u32{ 0, 0, 0, 0 } } },
     };
 
-    const renderPassInfo = volk.VkRenderPassBeginInfo{
-        .sType = volk.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+    const renderPassInfo = c.VkRenderPassBeginInfo{
+        .sType = c.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .renderPass = self.renderPass,
         .framebuffer = self.swapChainFramebuffers[imageIndex],
         .renderArea = .{
@@ -378,34 +372,34 @@ pub fn recordCommandBuffer(self: *JrGui, imageIndex: u32) void {
         .clearValueCount = 1,
         .pClearValues = &clearValues,
     };
-    _ = volk.vkCmdBeginRenderPass.?(self.commandBuffers[self.currentFrame], &renderPassInfo, volk.VK_SUBPASS_CONTENTS_INLINE);
+    _ = c.vkCmdBeginRenderPass.?(self.commandBuffers[self.currentFrame], &renderPassInfo, c.VK_SUBPASS_CONTENTS_INLINE);
 
     zgui.backend.render(self.commandBuffers[self.currentFrame]);
 
-    _ = volk.vkCmdEndRenderPass.?(self.commandBuffers[self.currentFrame]);
-    if (volk.vkEndCommandBuffer.?(self.commandBuffers[self.currentFrame]) != volk.VK_SUCCESS) {
+    _ = c.vkCmdEndRenderPass.?(self.commandBuffers[self.currentFrame]);
+    if (c.vkEndCommandBuffer.?(self.commandBuffers[self.currentFrame]) != c.VK_SUCCESS) {
         @panic("Failed to record gui command buffer!");
     }
 }
 
-pub export fn jrGui_destroy(self: *JrGui) callconv(.C) void {
+pub fn destroy(self: *Self) void {
     zgui.backend.deinit();
     zgui.deinit();
 
     destroyFramebuffers(self);
 
-    volk.vkDestroyRenderPass.?(self.vulkan_ctx.device.*, self.renderPass, null);
+    c.vkDestroyRenderPass.?(self.vulkan_ctx.device.*, self.renderPass, null);
 
-    volk.vkDestroyDescriptorPool.?(self.vulkan_ctx.device.*, self.descriptorPool, null);
-    volk.vkDestroyCommandPool.?(self.vulkan_ctx.device.*, self.commandPool, null);
+    c.vkDestroyDescriptorPool.?(self.vulkan_ctx.device.*, self.descriptorPool, null);
+    c.vkDestroyCommandPool.?(self.vulkan_ctx.device.*, self.commandPool, null);
 
     for (self.renderFinishedSemaphores) |renderFinishedSemaphore| {
-        volk.vkDestroySemaphore.?(self.vulkan_ctx.device.*, renderFinishedSemaphore, null);
+        c.vkDestroySemaphore.?(self.vulkan_ctx.device.*, renderFinishedSemaphore, null);
     }
 }
 
-pub fn destroyFramebuffers(self: *JrGui) void {
+pub fn destroyFramebuffers(self: *Self) void {
     for (self.swapChainFramebuffers) |framebuffer| {
-        volk.vkDestroyFramebuffer.?(self.vulkan_ctx.device.*, framebuffer, null);
+        c.vkDestroyFramebuffer.?(self.vulkan_ctx.device.*, framebuffer, null);
     }
 }

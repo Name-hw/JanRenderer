@@ -3,6 +3,7 @@
     "volk",
     "cglm",
     "stb",
-    "tinyobjloader"
+    "tinyobjloader",
+    "vulkan-memory-allocator"
   ]
 }
