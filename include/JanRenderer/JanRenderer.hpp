@@ -232,13 +232,14 @@ private:
 
   VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
-  VkImage colorImage;
-  VkDeviceMemory colorImageMemory;
-  VkImageView colorImageView;
+  JrImage *colorImage;
 
   std::vector<VkBuffer> shaderStorageBuffers;
   std::vector<VkDeviceMemory> shaderStorageBuffersMemory;
 
+  VmaAllocator vmaAllocator;
+
+  // JrObjects
   // HMODULE JrClasses_lib; dynamic loading of JrClasses library (old way)
   JrVulkanContext *vulkanCtx;
   JrCamera *camera;
@@ -322,6 +323,7 @@ private:
   bool isDeviceSuitable(VkPhysicalDevice physicalDevice_);
   bool checkDeviceExtensionSupport(VkPhysicalDevice physicalDevice_);
   void createLogicalDevice();
+  void createVmaAllocator();
   void createSwapChain();
   SwapChainSupportDetails
   querySwapChainSupport(VkPhysicalDevice physicalDevice_);
@@ -337,6 +339,7 @@ private:
   void createGraphicsPipeline();
   void createComputePipeline();
   void createCommandPools();
+  void createVulkanContext();
   void createColorResources();
   void createDepthResources();
   VkFormat findDepthFormat();

@@ -507,6 +507,7 @@ void JanRenderer::initVulkan() {
   createSurface();
   pickPhysicalDevice();
   createLogicalDevice();
+  createVmaAllocator();
   createSwapChain();
   createImageViews();
   createRenderPass();
@@ -515,6 +516,7 @@ void JanRenderer::initVulkan() {
   createGraphicsPipeline();
   createComputePipeline();
   createCommandPools();
+  createVulkanContext();
   createColorResources();
   createDepthResources();
   createFramebuffers();
@@ -559,7 +561,7 @@ void JanRenderer::createInstance() {
   createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   createInfo.ppEnabledExtensionNames = extensions.data();
 
-  std::cout << "required extensions:\n";
+  std::cout << "required instance extensions:\n";
 
   for (const auto &extension : extensions) {
     std::cout << '\t' << extension << '\n';
@@ -740,15 +742,32 @@ void JanRenderer::createLogicalDevice() {
   deviceFeatures.sampleRateShading =
       VK_TRUE; // enable sample shading feature for the device
 
+  VkPhysicalDeviceVulkan12Features vulkan12Features{};
+  vulkan12Features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  vulkan12Features.bufferDeviceAddress = VK_TRUE;
+  vulkan12Features.descriptorIndexing = VK_TRUE;
+
+  VkPhysicalDeviceFeatures2 deviceFeatures2{};
+  deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  deviceFeatures2.pNext = &vulkan12Features;
+  deviceFeatures2.features = deviceFeatures;
+
   VkDeviceCreateInfo createInfo{};
   createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+  createInfo.pNext = &deviceFeatures2;
   createInfo.queueCreateInfoCount =
       static_cast<uint32_t>(queueCreateInfos.size());
   createInfo.pQueueCreateInfos = queueCreateInfos.data();
-  createInfo.pEnabledFeatures = &deviceFeatures;
   createInfo.enabledExtensionCount =
       static_cast<uint32_t>(deviceExtensions.size());
   createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+
+  std::cout << "required device extensions:\n";
+
+  for (const auto &extension : deviceExtensions) {
+    std::cout << '\t' << extension << '\n';
+  }
 
   if (enableValidationLayers) {
     createInfo.enabledLayerCount =
@@ -771,6 +790,25 @@ void JanRenderer::createLogicalDevice() {
   vkGetDeviceQueue(device, queueFamilyIndices.transferFamily, 0,
                    &transferQueue);
   vkGetDeviceQueue(device, queueFamilyIndices.computeFamily, 0, &computeQueue);
+}
+
+// initVulkan createVmaAllocator
+void JanRenderer::createVmaAllocator() {
+
+  VmaAllocatorCreateInfo allocatorCreateInfo = {};
+  allocatorCreateInfo.physicalDevice = physicalDevice;
+  allocatorCreateInfo.device = device;
+  allocatorCreateInfo.instance = instance;
+  allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+
+  VmaVulkanFunctions vulkanFunctions;
+  vmaImportVulkanFunctionsFromVolk(&allocatorCreateInfo, &vulkanFunctions);
+
+  allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
+
+  if (vmaCreateAllocator(&allocatorCreateInfo, &vmaAllocator) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to create VMA allocator!");
+  }
 }
 
 // initVulkan createSwapChain
@@ -1288,18 +1326,52 @@ void JanRenderer::createCommandPools() {
                     queueFamilyIndices.computeFamily, computeCommandPool);
 }
 
+// initVulkan createVulkanContext
+void JanRenderer::createVulkanContext() {
+  vulkanCtx = new JrVulkanContext;
+  vulkanCtx->instance = &instance;
+  vulkanCtx->physicalDevice = &physicalDevice;
+  vulkanCtx->device = &device;
+  vulkanCtx->queueFamilyIndices = &queueFamilyIndices;
+  vulkanCtx->graphicsQueue = &graphicsQueue;
+  vulkanCtx->presentQueue = &presentQueue;
+  vulkanCtx->transferQueue = &transferQueue;
+  vulkanCtx->computeQueue = &computeQueue;
+  vulkanCtx->swapChain = &swapChain;
+  vulkanCtx->swapChainFormat = &swapChainImageFormat;
+  vulkanCtx->swapChainExtent = &swapChainExtent;
+  vulkanCtx->swapChainImageViews = swapChainImageViews.data();
+  vulkanCtx->renderPass = &renderPass;
+  vulkanCtx->vmaAllocator = &vmaAllocator;
+}
+
 // initVulkan createColorResources
 void JanRenderer::createColorResources() {
-  VkFormat colorFormat = swapChainImageFormat;
+  // createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples,
+  //             colorFormat, VK_IMAGE_TILING_OPTIMAL,
+  //             VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+  //                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+  //             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage,
+  //             colorImageMemory);
+  // colorImageView =
+  //    createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT,
+  //    1);
 
-  createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples,
-              colorFormat, VK_IMAGE_TILING_OPTIMAL,
-              VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage,
-              colorImageMemory);
-  colorImageView =
-      createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+  colorImage = new JrImage;
+  colorImage->vulkanCtx = vulkanCtx;
+  colorImage->vmaAllocationCreateInfo = {};
+  colorImage->vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+  colorImage->vmaAllocationCreateInfo.requiredFlags =
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  colorImage->imageFormat = swapChainImageFormat;
+  colorImage->imageExtent = {swapChainExtent.width, swapChainExtent.height, 1};
+  colorImage->imageMipLevels = 1;
+  colorImage->imageSampleCount = msaaSamples;
+  colorImage->imageUsage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  colorImage->imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+  jrImage_init(colorImage, VK_IMAGE_TILING_OPTIMAL);
 }
 
 // initVulkan createDepthResources
@@ -1355,8 +1427,8 @@ void JanRenderer::createFramebuffers() {
   swapChainFramebuffers.resize(swapChainImageViews.size());
 
   for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-    std::array<VkImageView, 3> attachments = {colorImageView, depthImageView,
-                                              swapChainImageViews[i]};
+    std::array<VkImageView, 3> attachments = {
+        colorImage->imageView, depthImageView, swapChainImageViews[i]};
 
     VkFramebufferCreateInfo framebufferInfo{};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -2024,24 +2096,7 @@ void JanRenderer::createSyncObjects() {
 }
 
 // initJrObjectsAfterInitVulkan
-void JanRenderer::initJrObjectsAfterInitVulkan() {
-  vulkanCtx = new JrVulkanContext;
-  vulkanCtx->instance = &instance;
-  vulkanCtx->physicalDevice = &physicalDevice;
-  vulkanCtx->device = &device;
-  vulkanCtx->queueFamilyIndices = &queueFamilyIndices;
-  vulkanCtx->graphicsQueue = &graphicsQueue;
-  vulkanCtx->presentQueue = &presentQueue;
-  vulkanCtx->transferQueue = &transferQueue;
-  vulkanCtx->computeQueue = &computeQueue;
-  vulkanCtx->swapChain = &swapChain;
-  vulkanCtx->swapChainFormat = &swapChainImageFormat;
-  vulkanCtx->swapChainExtent = &swapChainExtent;
-  vulkanCtx->swapChainImageViews = swapChainImageViews.data();
-  vulkanCtx->renderPass = &renderPass;
-
-  initGui();
-}
+void JanRenderer::initJrObjectsAfterInitVulkan() { initGui(); }
 
 // initJrClassesAfterInitVulkan initGui
 void JanRenderer::initGui() {
@@ -2122,7 +2177,7 @@ void JanRenderer::drawFrame() {
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     recreateSwapChain();
-    jrGui_recreateSwapChain(gui, swapChainImageFormat, swapChainExtent,
+    jrGui_recreateSwapchain(gui, swapChainImageFormat, swapChainExtent,
                             swapChainImageViews.data());
     return;
   } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -2178,7 +2233,7 @@ void JanRenderer::drawFrame() {
       framebufferResized) {
     framebufferResized = false;
     recreateSwapChain();
-    jrGui_recreateSwapChain(gui, swapChainImageFormat, swapChainExtent,
+    jrGui_recreateSwapchain(gui, swapChainImageFormat, swapChainExtent,
                             swapChainImageViews.data());
   } else if (result != VK_SUCCESS) {
     throw std::runtime_error("failed to present swap chain image!");
@@ -2383,6 +2438,8 @@ void JanRenderer::cleanup() {
   vkDestroyCommandPool(device, transferCommandPool, nullptr);
   vkDestroyCommandPool(device, computeCommandPool, nullptr);
 
+  vmaDestroyAllocator(vmaAllocator);
+
   vkDestroyDevice(device, nullptr);
 
   if (enableValidationLayers) {
@@ -2399,13 +2456,12 @@ void JanRenderer::cleanup() {
 
 // cleanup cleanupSwapChain
 void JanRenderer::cleanupSwapChain() {
-  vkDestroyImageView(device, colorImageView, nullptr);
-  vkDestroyImage(device, colorImage, nullptr);
-  vkFreeMemory(device, colorImageMemory, nullptr);
+  jrImage_destroy(colorImage);
 
   vkDestroyImageView(device, depthImageView, nullptr);
   vkDestroyImage(device, depthImage, nullptr);
   vkFreeMemory(device, depthImageMemory, nullptr);
+  // jrImage_destroy(depthImage);
 
   for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
     vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);

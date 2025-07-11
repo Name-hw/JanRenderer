@@ -51,13 +51,13 @@ commandPool: c.VkCommandPool,
 commandBuffers: [3]c.VkCommandBuffer,
 renderFinishedSemaphores: [3]c.VkSemaphore,
 descriptorPool: c.VkDescriptorPool,
-msaaSamples: c.VkSampleCountFlagBits,
-currentFrame: u32,
 window: *zglfw.Window,
 initInfo: zgui.backend.ImGui_ImplVulkan_InitInfo,
 fontSet: *FontSet,
 style: *zgui.Style,
 viewModel: *JrGuiViewModel,
+msaaSamples: c.VkSampleCountFlagBits,
+currentFrame: u32,
 
 // Will use this in other code
 //pub const MessageType = enum { Print, Warning, Error };

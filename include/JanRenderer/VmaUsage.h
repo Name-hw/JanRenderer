@@ -3,7 +3,6 @@
 #define VMA_VULKAN_VERSION 1003000 // Vulkan 1.3
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
-#define VMA_VOLK_HEADER_PATH
 
 #include <JanRenderer/VolkUsage.h>
 
