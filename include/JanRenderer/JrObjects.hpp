@@ -3,6 +3,8 @@
 #include <JanRenderer/common.hpp>
 
 extern "C" {
+struct JrVulkanContext;
+
 struct JrQueueFamilyIndices {
   uint32_t graphicsFamily;
   uint32_t presentFamily;
@@ -10,6 +12,28 @@ struct JrQueueFamilyIndices {
   uint32_t computeFamily;
 };
 bool jrQueueFamilyIndices_isComplete(JrQueueFamilyIndices *);
+
+struct JrImage {
+  JrVulkanContext *vulkanCtx;
+  VkImage image;
+  VkImageView imageView;
+  VmaAllocation vmaAllocation;
+  VmaAllocationCreateInfo vmaAllocationCreateInfo;
+  VkImageLayout imageLayout;
+  VkFormat imageFormat;
+  VkExtent3D imageExtent;
+  uint32_t imageMipLevels;
+  VkSampleCountFlagBits imageSampleCount;
+  VkImageUsageFlags imageUsage;
+  VkImageAspectFlags imageAspectMask;
+};
+void jrImage_init(JrImage *, VkImageTiling tiling);
+void jrImage_initFromSwapchain(JrImage *);
+void jrImage_transitionImageLayout(JrImage *, VkCommandBuffer commandBuffer,
+                                   VkImageLayout newLayout);
+void jrImage_copyToImage(JrImage *, VkCommandBuffer commandBuffer,
+                         JrImage *destination);
+void jrImage_destroy(JrImage *);
 
 struct JrVulkanContext {
   VkInstance *instance;
@@ -23,11 +47,10 @@ struct JrVulkanContext {
   VkQueue *transferQueue;
   VkQueue *computeQueue;
 
-  VkSwapchainKHR *swapChain;
-  VkImage *swapChainImages;
-  VkFormat *swapChainFormat;
-  VkExtent2D *swapChainExtent;
-  VkImageView *swapChainImageViews;
+  VkSwapchainKHR *swapchain;
+  JrImage *(*swapchainImages)[3];
+  VkFormat *swapchainFormat;
+  VkExtent2D *swapchainExtent;
 
   VkRenderPass *renderPass;
 
@@ -101,26 +124,8 @@ void jrGui_init(JrGui *);
 void jrGui_newFrame(JrGui *, uint32_t width, uint32_t height,
                     uint32_t currentFrame);
 // void jrGui_setupDockSpace(JrGui *);
-void jrGui_recreateSwapchain(JrGui *, VkFormat swapChainImageFormat_,
-                             VkExtent2D swapChainExtent_,
-                             VkImageView *swapChainImageViews_);
+void jrGui_recreateSwapchain(JrGui *);
 void jrGui_render(JrGui *, uint32_t imageIndex, uint32_t waitSemaphoreCount,
                   VkSemaphore *pWaitSemaphores, VkFence fence);
 void jrGui_destroy(JrGui *);
-
-struct JrImage {
-  JrVulkanContext *vulkanCtx;
-  VkImage image;
-  VkImageView imageView;
-  VmaAllocation vmaAllocation;
-  VmaAllocationCreateInfo vmaAllocationCreateInfo;
-  VkFormat imageFormat;
-  VkExtent3D imageExtent;
-  uint32_t imageMipLevels;
-  VkSampleCountFlagBits imageSampleCount;
-  VkImageUsageFlags imageUsage;
-  VkImageAspectFlags imageAspectMask;
-};
-void jrImage_init(JrImage *, VkImageTiling tiling);
-void jrImage_destroy(JrImage *);
 }

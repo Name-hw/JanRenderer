@@ -208,32 +208,32 @@ pub fn build(b: *std.Build) !void {
     lib_step.dependOn(&zglfw_lib.step);
     lib_step.dependOn(&zgui_lib.step);
 
-    const JrObject_lib = b.addStaticLibrary(.{
+    const JrObjects_lib = b.addStaticLibrary(.{
         .name = "JrObjects",
         .root_source_file = b.path("src/JanRenderer/JrObjects/exports.zig"),
         .target = target,
         .optimize = optimize,
     });
-    // JrObject_lib C source
-    JrObject_lib.linkLibC();
-    JrObject_lib.addIncludePath(b.path("include/"));
-    // JrObject_lib vcpkg library
-    JrObject_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
-    JrObject_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
-    // JrObject_lib zig library
-    JrObject_lib.root_module.addImport("zmath", zmath_module);
-    JrObject_lib.root_module.addImport("zglfw", zglfw_module);
-    JrObject_lib.root_module.addImport("zgui", zgui_module);
+    // JrObjects_lib C source
+    JrObjects_lib.linkLibC();
+    JrObjects_lib.addIncludePath(b.path("include/"));
+    // JrObjects_lib vcpkg library
+    JrObjects_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
+    JrObjects_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+    // JrObjects_lib zig library
+    JrObjects_lib.root_module.addImport("zmath", zmath_module);
+    JrObjects_lib.root_module.addImport("zglfw", zglfw_module);
+    JrObjects_lib.root_module.addImport("zgui", zgui_module);
 
     // JrObjects.h (unused)
     // There are many bugs in zig, so use JrObjects.hpp that I created instead of
     // this automatically generated header file.
-    //const JrObject_lib_header = JrObject_lib.getEmittedH();
-    //JrObject_lib.installHeader(JrObject_lib_header, "");
+    //const JrObject_lib_header = JrObjects_lib.getEmittedH();
+    //JrObjects_lib.installHeader(JrObject_lib_header, "");
 
-    const JrObject_lib_installArtifact = b.addInstallArtifact(JrObject_lib, .{});
+    const JrObjects_lib_installArtifact = b.addInstallArtifact(JrObjects_lib, .{});
     //JrObject_lib_installArtifact.emitted_h = JrObject_lib_header.;
-    lib_step.dependOn(&JrObject_lib_installArtifact.step);
+    lib_step.dependOn(&JrObjects_lib_installArtifact.step);
 
     //// JrObjects_tests
     //const JrObjects_tests = b.addTest(.{
@@ -269,10 +269,10 @@ pub fn build(b: *std.Build) !void {
     JanRenderer_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
     JanRenderer_lib.installHeadersDirectory(b.path("vcpkg_installed/x64-windows/include/cglm/"), "cglm", .{});
     // JanRenderer_lib zig library
-    JanRenderer_lib.linkLibrary(JrObject_lib);
     JanRenderer_lib.linkLibrary(zglfw_lib);
     JanRenderer_lib.linkLibrary(zgui_lib);
     JanRenderer_lib.addIncludePath(zgui.path("libs/imgui"));
+    JanRenderer_lib.linkLibrary(JrObjects_lib);
 
     const lib_installArtifact = b.addInstallArtifact(JanRenderer_lib, .{});
 
@@ -294,12 +294,14 @@ pub fn build(b: *std.Build) !void {
     TestApp_exe.addIncludePath(b.path("zig-out/include/"));
     TestApp_exe.addLibraryPath(b.path("zig-out/lib/"));
     TestApp_exe.linkLibrary(JanRenderer_lib);
+    TestApp_exe.linkLibrary(JrObjects_lib);
 
     const exe_installArtifact = b.addInstallArtifact(TestApp_exe, .{});
 
     const exe_step = b.step("exe", "Run the executable build step");
     exe_step.dependOn(&zglfw_lib.step);
     exe_step.dependOn(&zgui_lib.step);
+    exe_step.dependOn(&JrObjects_lib_installArtifact.step);
     exe_step.dependOn(&exe_installArtifact.step);
 
     b.getInstallStep().dependOn(lib_step);

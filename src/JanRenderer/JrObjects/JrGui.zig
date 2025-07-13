@@ -210,12 +210,12 @@ pub fn createGuiRenderPass(self: *Self) void {
 }
 
 pub fn createFramebuffers(self: *Self) void {
-    for (self.vulkan_ctx.swapchain_imageViews.*, 0..) |swapChainImageView, i| {
+    for (self.vulkan_ctx.swapchain_images.*, 0..) |swapchainImage, i| {
         const framebufferInfo = c.VkFramebufferCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
             .renderPass = self.renderPass,
             .attachmentCount = 1,
-            .pAttachments = &swapChainImageView,
+            .pAttachments = &swapchainImage.image_view,
             .width = self.vulkan_ctx.swapchain_extent.*.width,
             .height = self.vulkan_ctx.swapchain_extent.*.height,
             .layers = 1,
@@ -308,11 +308,7 @@ pub fn newFrame(self: *Self, width: u32, height: u32, currentFrame: u32) void {
 //    _ = dockSpace;
 //}
 
-pub fn recreateSwapchain(self: *Self, swapChainImageFormat_: c.VkFormat, swapChainExtent_: c.VkExtent2D, swapChainImageViews_: *[3]c.VkImageView) void {
-    self.vulkan_ctx.swapchain_format.* = swapChainImageFormat_;
-    self.vulkan_ctx.swapchain_extent.* = swapChainExtent_;
-    self.vulkan_ctx.swapchain_imageViews = swapChainImageViews_;
-
+pub fn recreateSwapchain(self: *Self) void {
     destroyFramebuffers(self);
     createFramebuffers(self);
 }
