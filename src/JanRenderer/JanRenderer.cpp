@@ -52,6 +52,35 @@ static std::vector<char> readFile(const std::string &filename) {
   return buffer;
 }
 
+template <typename T, int N>
+std::array<T *, N>
+uniquePtrVectorToRawPtrArray(std::vector<std::unique_ptr<T>> &uniquePtrs) {
+  std::array<T *, N> rawPtrs;
+
+  std::transform(
+      uniquePtrs.begin(), uniquePtrs.end(), rawPtrs.begin(),
+      [](const std::unique_ptr<T> &uniquePtr) { return uniquePtr.get(); });
+
+  return rawPtrs;
+}
+
+template <typename T, int N>
+T *(*uniquePtrVectorToRawPtrArrayPtr(
+    std::vector<std::unique_ptr<T>> &uniquePtrs))[N] {
+  // static std::array<T *, N> rawPtrs =
+  //     uniquePtrVectorToRawPtrArray<T, N>(uniquePtrs);
+  // T *(*rawPtrsPtr)[N] = reinterpret_cast<T *(*)[N]>(&rawPtrs);
+
+  // return rawPtrsPtr;
+  T *(*rawPtrsPtr)[N] = reinterpret_cast<T *(*)[N]>(new T *[N]);
+
+  for (size_t i = 0; i < N; ++i) {
+    (*rawPtrsPtr)[i] = uniquePtrs[i].get();
+  }
+
+  return rawPtrsPtr;
+}
+
 // Class member functions
 JanRenderer::JanRenderer(const char *applicationName_, int width, int height)
     : width(width), height(height) {
@@ -287,66 +316,6 @@ void JanRenderer::createCommandPool(VkCommandPoolCreateFlags flags,
   }
 }
 
-void JanRenderer::transitionImageLayout(VkCommandBuffer commandBuffer,
-                                        VkImage image, VkFormat format,
-                                        VkImageLayout oldLayout,
-                                        VkImageLayout newLayout,
-                                        uint32_t mipLevels) {
-  VkImageMemoryBarrier barrier{};
-  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout = oldLayout;
-  barrier.newLayout = newLayout;
-  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = image;
-  barrier.subresourceRange.baseMipLevel = 0;
-  barrier.subresourceRange.levelCount = mipLevels;
-  barrier.subresourceRange.baseArrayLayer = 0;
-  barrier.subresourceRange.layerCount = 1;
-
-  VkPipelineStageFlags sourceStage;
-  VkPipelineStageFlags destinationStage;
-
-  if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-      newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-    barrier.srcAccessMask = 0;
-    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-    sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-             newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-    sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-  } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-             newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-    barrier.srcAccessMask = 0;
-    barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-    sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-  } else {
-    throw std::invalid_argument("unsupported layout transition!");
-  }
-
-  if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-
-    if (hasStencilComponent(format)) {
-      barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-  } else {
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  }
-
-  vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0,
-                       nullptr, 0, nullptr, 1, &barrier);
-}
-
 void JanRenderer::copyBufferToImage(const VkCommandBuffer &commandBuffer,
                                     VkBuffer buffer, VkImage image,
                                     uint32_t width, uint32_t height) {
@@ -365,28 +334,6 @@ void JanRenderer::copyBufferToImage(const VkCommandBuffer &commandBuffer,
 
   vkCmdCopyBufferToImage(commandBuffer, buffer, image,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-}
-
-VkImageView JanRenderer::createImageView(VkImage image, VkFormat format,
-                                         VkImageAspectFlags aspectFlags,
-                                         uint32_t mipLevels) {
-  VkImageViewCreateInfo viewInfo{};
-  viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  viewInfo.image = image;
-  viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  viewInfo.format = format;
-  viewInfo.subresourceRange.aspectMask = aspectFlags;
-  viewInfo.subresourceRange.baseMipLevel = 0;
-  viewInfo.subresourceRange.levelCount = mipLevels;
-  viewInfo.subresourceRange.baseArrayLayer = 0;
-  viewInfo.subresourceRange.layerCount = 1;
-
-  VkImageView imageView;
-  if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create texture image view!");
-  }
-
-  return imageView;
 }
 
 bool JanRenderer::hasStencilComponent(VkFormat format) {
@@ -507,19 +454,20 @@ void JanRenderer::initVulkan() {
   createSurface();
   pickPhysicalDevice();
   createLogicalDevice();
+  createVmaAllocator();
+  createVulkanContextBeforeCreateSwapChain();
   createSwapChain();
-  createImageViews();
   createRenderPass();
   createDescriptorSetLayout();
   createComputeDescriptorSetLayout();
   createGraphicsPipeline();
   createComputePipeline();
   createCommandPools();
+  createVulkanContext();
   createColorResources();
   createDepthResources();
   createFramebuffers();
   createTextureImage();
-  createTextureImageView();
   createTextureSampler();
   loadModel();
   createVertexBuffer();
@@ -559,7 +507,7 @@ void JanRenderer::createInstance() {
   createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   createInfo.ppEnabledExtensionNames = extensions.data();
 
-  std::cout << "required extensions:\n";
+  std::cout << "required instance extensions:\n";
 
   for (const auto &extension : extensions) {
     std::cout << '\t' << extension << '\n';
@@ -740,15 +688,32 @@ void JanRenderer::createLogicalDevice() {
   deviceFeatures.sampleRateShading =
       VK_TRUE; // enable sample shading feature for the device
 
+  VkPhysicalDeviceVulkan12Features vulkan12Features{};
+  vulkan12Features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  vulkan12Features.bufferDeviceAddress = VK_TRUE;
+  vulkan12Features.descriptorIndexing = VK_TRUE;
+
+  VkPhysicalDeviceFeatures2 deviceFeatures2{};
+  deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  deviceFeatures2.pNext = &vulkan12Features;
+  deviceFeatures2.features = deviceFeatures;
+
   VkDeviceCreateInfo createInfo{};
   createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+  createInfo.pNext = &deviceFeatures2;
   createInfo.queueCreateInfoCount =
       static_cast<uint32_t>(queueCreateInfos.size());
   createInfo.pQueueCreateInfos = queueCreateInfos.data();
-  createInfo.pEnabledFeatures = &deviceFeatures;
   createInfo.enabledExtensionCount =
       static_cast<uint32_t>(deviceExtensions.size());
   createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+
+  std::cout << "required device extensions:\n";
+
+  for (const auto &extension : deviceExtensions) {
+    std::cout << '\t' << extension << '\n';
+  }
 
   if (enableValidationLayers) {
     createInfo.enabledLayerCount =
@@ -771,6 +736,40 @@ void JanRenderer::createLogicalDevice() {
   vkGetDeviceQueue(device, queueFamilyIndices.transferFamily, 0,
                    &transferQueue);
   vkGetDeviceQueue(device, queueFamilyIndices.computeFamily, 0, &computeQueue);
+}
+
+// initVulkan createVmaAllocator
+void JanRenderer::createVmaAllocator() {
+
+  VmaAllocatorCreateInfo allocatorCreateInfo = {};
+  allocatorCreateInfo.physicalDevice = physicalDevice;
+  allocatorCreateInfo.device = device;
+  allocatorCreateInfo.instance = instance;
+  allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+
+  VmaVulkanFunctions vulkanFunctions;
+  vmaImportVulkanFunctionsFromVolk(&allocatorCreateInfo, &vulkanFunctions);
+
+  allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
+
+  if (vmaCreateAllocator(&allocatorCreateInfo, &vmaAllocator) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to create VMA allocator!");
+  }
+}
+
+// initVulkan createVulkanContextBeforeCreateSwapChain
+void JanRenderer::createVulkanContextBeforeCreateSwapChain() {
+  vulkanCtx = JrVulkanContext{
+      .instance = &instance,
+      .physicalDevice = &physicalDevice,
+      .device = &device,
+      .queueFamilyIndices = &queueFamilyIndices,
+      .graphicsQueue = &graphicsQueue,
+      .presentQueue = &presentQueue,
+      .transferQueue = &transferQueue,
+      .computeQueue = &computeQueue,
+      .vmaAllocator = &vmaAllocator,
+  };
 }
 
 // initVulkan createSwapChain
@@ -826,9 +825,31 @@ void JanRenderer::createSwapChain() {
   }
 
   vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
-  swapChainImages.resize(imageCount);
-  vkGetSwapchainImagesKHR(device, swapChain, &imageCount,
-                          swapChainImages.data());
+  VkImage *images = new VkImage[imageCount];
+  vkGetSwapchainImagesKHR(device, swapChain, &imageCount, images);
+
+  swapChainImages.reserve(imageCount);
+
+  for (int i = 0; i < imageCount; i++) {
+    auto swapchainImage = std::make_unique<JrImage>();
+    swapchainImage->vulkanCtx = &vulkanCtx;
+    swapchainImage->image = images[i];
+    swapchainImage->imageView = VK_NULL_HANDLE;
+    swapchainImage->vmaAllocation = nullptr;
+    swapchainImage->vmaAllocationCreateInfo = {};
+    swapchainImage->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    swapchainImage->imageFormat = surfaceFormat.format;
+    swapchainImage->imageExtent = {extent.width, extent.height, 1};
+    swapchainImage->imageMipLevels = 1;
+    swapchainImage->imageSampleCount = VK_SAMPLE_COUNT_1_BIT;
+    swapchainImage->imageUsage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchainImage->imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    jrImage_initFromSwapchain(swapchainImage.get());
+
+    swapChainImages.push_back(std::move(swapchainImage));
+  }
 
   swapChainImageFormat = surfaceFormat.format;
   swapChainExtent = extent;
@@ -911,16 +932,6 @@ JanRenderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) {
                    capabilities.maxImageExtent.height);
 
     return actualExtent;
-  }
-}
-
-// initVulkan createImageViews
-void JanRenderer::createImageViews() {
-  swapChainImageViews.resize(swapChainImages.size());
-
-  for (size_t i = 0; i < swapChainImages.size(); i++) {
-    swapChainImageViews[i] = createImageView(
-        swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
   }
 }
 
@@ -1288,36 +1299,76 @@ void JanRenderer::createCommandPools() {
                     queueFamilyIndices.computeFamily, computeCommandPool);
 }
 
+// initVulkan createVulkanContext
+void JanRenderer::createVulkanContext() {
+  vulkanCtx.swapchain = &swapChain;
+  vulkanCtx.swapchainImages =
+      uniquePtrVectorToRawPtrArrayPtr<JrImage, 3>(swapChainImages);
+  vulkanCtx.swapchainFormat = &swapChainImageFormat;
+  vulkanCtx.swapchainExtent = &swapChainExtent;
+  vulkanCtx.renderPass = &renderPass;
+}
+
 // initVulkan createColorResources
 void JanRenderer::createColorResources() {
-  VkFormat colorFormat = swapChainImageFormat;
+  // createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples,
+  //             colorFormat, VK_IMAGE_TILING_OPTIMAL,
+  //             VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+  //                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+  //             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage,
+  //             colorImageMemory);
+  // colorImageView =
+  //    createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT,
+  //    1);
+  colorImage = std::make_unique<JrImage>();
+  colorImage->vulkanCtx = &vulkanCtx;
+  colorImage->vmaAllocationCreateInfo = {};
+  colorImage->vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+  colorImage->vmaAllocationCreateInfo.requiredFlags =
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  colorImage->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  colorImage->imageFormat = swapChainImageFormat;
+  colorImage->imageExtent = {swapChainExtent.width, swapChainExtent.height, 1};
+  colorImage->imageMipLevels = 1;
+  colorImage->imageSampleCount = msaaSamples;
+  colorImage->imageUsage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  colorImage->imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-  createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples,
-              colorFormat, VK_IMAGE_TILING_OPTIMAL,
-              VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage,
-              colorImageMemory);
-  colorImageView =
-      createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+  jrImage_init(colorImage.get(), VK_IMAGE_TILING_OPTIMAL);
 }
 
 // initVulkan createDepthResources
 void JanRenderer::createDepthResources() {
   VkFormat depthFormat = findDepthFormat();
 
-  createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples,
-              depthFormat, VK_IMAGE_TILING_OPTIMAL,
-              VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage,
-              depthImageMemory);
-  depthImageView =
-      createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+  // createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples,
+  //             depthFormat, VK_IMAGE_TILING_OPTIMAL,
+  //             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+  //             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage,
+  //             depthImageMemory);
+  // depthImageView =
+  //     createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+  depthImage = std::make_unique<JrImage>();
+  depthImage->vulkanCtx = &vulkanCtx;
+  depthImage->vmaAllocationCreateInfo = {};
+  depthImage->vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+  depthImage->vmaAllocationCreateInfo.requiredFlags =
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  depthImage->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  depthImage->imageFormat = depthFormat;
+  depthImage->imageExtent = {swapChainExtent.width, swapChainExtent.height, 1};
+  depthImage->imageMipLevels = 1;
+  depthImage->imageSampleCount = msaaSamples;
+  depthImage->imageUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  depthImage->imageAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+  jrImage_init(depthImage.get(), VK_IMAGE_TILING_OPTIMAL);
 
   VkCommandBuffer commandBuffer = beginSingleTimeCommands(commandPool);
-  transitionImageLayout(commandBuffer, depthImage, depthFormat,
-                        VK_IMAGE_LAYOUT_UNDEFINED,
-                        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
+  jrImage_transitionImageLayout(
+      depthImage.get(), commandBuffer,
+      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
   endSingleTimeCommands(graphicsQueue, commandPool, commandBuffer);
 }
 
@@ -1352,11 +1403,12 @@ JanRenderer::findSupportedFormat(const std::vector<VkFormat> &candidates,
 
 // initVulkan createFramebuffers
 void JanRenderer::createFramebuffers() {
-  swapChainFramebuffers.resize(swapChainImageViews.size());
+  swapChainFramebuffers.resize(swapChainImages.size());
 
-  for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-    std::array<VkImageView, 3> attachments = {colorImageView, depthImageView,
-                                              swapChainImageViews[i]};
+  for (size_t i = 0; i < swapChainImages.size(); i++) {
+    std::array<VkImageView, 3> attachments = {colorImage->imageView,
+                                              depthImage->imageView,
+                                              swapChainImages[i]->imageView};
 
     VkFramebufferCreateInfo framebufferInfo{};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -1406,22 +1458,41 @@ void JanRenderer::createTextureImage() {
 
   stbi_image_free(pixels);
 
-  createImage(texWidth, texHeight, mipLevels, VK_SAMPLE_COUNT_1_BIT,
-              VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
-              VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                  VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage,
-              textureImageMemory);
+  // createImage(texWidth, texHeight, mipLevels, VK_SAMPLE_COUNT_1_BIT,
+  //             VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+  //             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+  //                 VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+  //                 VK_IMAGE_USAGE_SAMPLED_BIT,
+  //             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage,
+  //             textureImageMemory);
+  textureImage = std::make_unique<JrImage>();
+  textureImage->vulkanCtx = &vulkanCtx;
+  textureImage->vmaAllocationCreateInfo = {};
+  textureImage->vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+  textureImage->vmaAllocationCreateInfo.requiredFlags =
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  textureImage->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  textureImage->imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+  textureImage->imageExtent = {static_cast<uint32_t>(texWidth),
+                               static_cast<uint32_t>(texHeight), 1};
+  textureImage->imageMipLevels = mipLevels;
+  textureImage->imageSampleCount = VK_SAMPLE_COUNT_1_BIT;
+  textureImage->imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                             VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                             VK_IMAGE_USAGE_SAMPLED_BIT;
+  textureImage->imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+  jrImage_init(textureImage.get(), VK_IMAGE_TILING_OPTIMAL);
 
   std::vector<VkCommandBuffer> commandBuffers =
       setupCommandBuffer(transferCommandPool, 2);
 
-  transitionImageLayout(commandBuffers[0], textureImage,
-                        VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
-  copyBufferToImage(commandBuffers[1], stagingBuffer, textureImage,
+  jrImage_transitionImageLayout(textureImage.get(), commandBuffers[0],
+                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  copyBufferToImage(commandBuffers[1], stagingBuffer, textureImage->image,
                     static_cast<uint32_t>(texWidth),
                     static_cast<uint32_t>(texHeight));
+
   // transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating
   // mipmaps
 
@@ -1430,8 +1501,8 @@ void JanRenderer::createTextureImage() {
   vkDestroyBuffer(device, stagingBuffer, nullptr);
   vkFreeMemory(device, stagingBufferMemory, nullptr);
 
-  generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight,
-                  mipLevels);
+  generateMipmaps(textureImage->image, VK_FORMAT_R8G8B8A8_SRGB, texWidth,
+                  texHeight, mipLevels);
 }
 
 void JanRenderer::generateMipmaps(VkImage image, VkFormat imageFormat,
@@ -1519,55 +1590,6 @@ void JanRenderer::generateMipmaps(VkImage image, VkFormat imageFormat,
                        nullptr, 1, &barrier);
 
   endSingleTimeCommands(graphicsQueue, commandPool, commandBuffer);
-}
-
-// initVulkan createTextureImage createImage
-void JanRenderer::createImage(uint32_t width, uint32_t height,
-                              uint32_t mipLevels,
-                              VkSampleCountFlagBits numSamples, VkFormat format,
-                              VkImageTiling tiling, VkImageUsageFlags usage,
-                              VkMemoryPropertyFlags properties, VkImage &image,
-                              VkDeviceMemory &imageMemory) {
-  VkImageCreateInfo imageInfo{};
-  imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-  imageInfo.imageType = VK_IMAGE_TYPE_2D;
-  imageInfo.extent.width = width;
-  imageInfo.extent.height = height;
-  imageInfo.extent.depth = 1;
-  imageInfo.mipLevels = mipLevels;
-  imageInfo.arrayLayers = 1;
-  imageInfo.format = format;
-  imageInfo.tiling = tiling;
-  imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  imageInfo.usage = usage;
-  imageInfo.samples = numSamples;
-  imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-  if (vkCreateImage(device, &imageInfo, nullptr, &image) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create image!");
-  }
-
-  VkMemoryRequirements memRequirements;
-  vkGetImageMemoryRequirements(device, image, &memRequirements);
-
-  VkMemoryAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = memRequirements.size;
-  allocInfo.memoryTypeIndex =
-      findMemoryType(memRequirements.memoryTypeBits, properties);
-
-  if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("failed to allocate image memory!");
-  }
-
-  vkBindImageMemory(device, image, imageMemory, 0);
-}
-
-// initVulkan createTextureImageView
-void JanRenderer::createTextureImageView() {
-  textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-                                     VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
 }
 
 // initVulkan createTextureSampler
@@ -1785,7 +1807,7 @@ void JanRenderer::createDescriptorSets() {
 
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = textureImageView;
+    imageInfo.imageView = textureImage->imageView;
     imageInfo.sampler = textureSampler;
 
     std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
@@ -2024,24 +2046,7 @@ void JanRenderer::createSyncObjects() {
 }
 
 // initJrObjectsAfterInitVulkan
-void JanRenderer::initJrObjectsAfterInitVulkan() {
-  vulkanCtx = new JrVulkanContext;
-  vulkanCtx->instance = &instance;
-  vulkanCtx->physicalDevice = &physicalDevice;
-  vulkanCtx->device = &device;
-  vulkanCtx->queueFamilyIndices = &queueFamilyIndices;
-  vulkanCtx->graphicsQueue = &graphicsQueue;
-  vulkanCtx->presentQueue = &presentQueue;
-  vulkanCtx->transferQueue = &transferQueue;
-  vulkanCtx->computeQueue = &computeQueue;
-  vulkanCtx->swapChain = &swapChain;
-  vulkanCtx->swapChainFormat = &swapChainImageFormat;
-  vulkanCtx->swapChainExtent = &swapChainExtent;
-  vulkanCtx->swapChainImageViews = swapChainImageViews.data();
-  vulkanCtx->renderPass = &renderPass;
-
-  initGui();
-}
+void JanRenderer::initJrObjectsAfterInitVulkan() { initGui(); }
 
 // initJrClassesAfterInitVulkan initGui
 void JanRenderer::initGui() {
@@ -2055,7 +2060,7 @@ void JanRenderer::initGui() {
   guiViewModel->CameraIsRotatable = &camera->isRotatable;
 
   gui = new JrGui;
-  gui->vulkanCtx = vulkanCtx;
+  gui->vulkanCtx = &vulkanCtx;
   gui->msaaSamples = VK_SAMPLE_COUNT_1_BIT;
   gui->window = window;
   gui->viewModel = guiViewModel;
@@ -2122,8 +2127,7 @@ void JanRenderer::drawFrame() {
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     recreateSwapChain();
-    jrGui_recreateSwapChain(gui, swapChainImageFormat, swapChainExtent,
-                            swapChainImageViews.data());
+    jrGui_recreateSwapchain(gui);
     return;
   } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
     throw std::runtime_error("failed to acquire swap chain image!");
@@ -2178,8 +2182,7 @@ void JanRenderer::drawFrame() {
       framebufferResized) {
     framebufferResized = false;
     recreateSwapChain();
-    jrGui_recreateSwapChain(gui, swapChainImageFormat, swapChainExtent,
-                            swapChainImageViews.data());
+    jrGui_recreateSwapchain(gui);
   } else if (result != VK_SUCCESS) {
     throw std::runtime_error("failed to present swap chain image!");
   }
@@ -2248,6 +2251,9 @@ void JanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
                          &shaderStorageBuffers[currentFrame], offsets);
 
   vkCmdDraw(commandBuffer, PARTICLE_COUNT, 1, 0, 0);
+
+  // jrImage_copyToImage(colorImage, swapChainImages[imageIndex],
+  // commandBuffer);
 
   vkCmdEndRenderPass(commandBuffer);
 
@@ -2323,10 +2329,10 @@ void JanRenderer::recreateSwapChain() {
   cleanupSwapChain();
 
   createSwapChain();
-  createImageViews();
   createColorResources();
   createDepthResources();
   createFramebuffers();
+  createVulkanContext();
 }
 
 // cleanup
@@ -2345,10 +2351,7 @@ void JanRenderer::cleanup() {
   vkDestroyRenderPass(device, renderPass, nullptr);
 
   vkDestroySampler(device, textureSampler, nullptr);
-  vkDestroyImageView(device, textureImageView, nullptr);
-
-  vkDestroyImage(device, textureImage, nullptr);
-  vkFreeMemory(device, textureImageMemory, nullptr);
+  jrImage_destroy(textureImage.get());
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vkDestroyBuffer(device, uniformBuffers[i], nullptr);
@@ -2383,6 +2386,8 @@ void JanRenderer::cleanup() {
   vkDestroyCommandPool(device, transferCommandPool, nullptr);
   vkDestroyCommandPool(device, computeCommandPool, nullptr);
 
+  vmaDestroyAllocator(vmaAllocator);
+
   vkDestroyDevice(device, nullptr);
 
   if (enableValidationLayers) {
@@ -2399,21 +2404,15 @@ void JanRenderer::cleanup() {
 
 // cleanup cleanupSwapChain
 void JanRenderer::cleanupSwapChain() {
-  vkDestroyImageView(device, colorImageView, nullptr);
-  vkDestroyImage(device, colorImage, nullptr);
-  vkFreeMemory(device, colorImageMemory, nullptr);
+  jrImage_destroy(colorImage.get());
+  jrImage_destroy(depthImage.get());
 
-  vkDestroyImageView(device, depthImageView, nullptr);
-  vkDestroyImage(device, depthImage, nullptr);
-  vkFreeMemory(device, depthImageMemory, nullptr);
-
-  for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
+  for (size_t i = 0; i < swapChainImages.size(); i++) {
     vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
+    vkDestroyImageView(device, swapChainImages[i]->imageView, nullptr);
   }
 
-  for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-    vkDestroyImageView(device, swapChainImageViews[i], nullptr);
-  }
+  swapChainImages.clear();
 
   vkDestroySwapchainKHR(device, swapChain, nullptr);
 }

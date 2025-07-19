@@ -1,30 +1,27 @@
 const std = @import("std");
 const testing = std.testing;
-const cglm = @cImport({
-    @cDefine("CGLM_FORCE_DEPTH_ZERO_TO_ONE", "");
-    @cInclude("cglm/struct.h");
-});
 const FixedCglm = @import("utils/FixedCglm.zig");
 const zmath = @import("zmath");
 const zglfw = @import("zglfw");
 const common = @import("common.zig");
+const c = common.c;
 
-pub const JrCamera = extern struct {
-    position: cglm.vec3s,
-    velocity: cglm.vec3s,
+const Self = @This();
 
-    pitch: f32,
-    yaw: f32,
+position: c.vec3s,
+velocity: c.vec3s,
 
-    speed: f32,
-    fieldOfView: f32,
+pitch: f32,
+yaw: f32,
 
-    isRotatable: bool,
-};
+speed: f32,
+fieldOfView: f32,
 
-pub export fn jrCamera_init(self: *JrCamera) callconv(.C) void {
-    self.position = cglm.glms_vec3_zero();
-    self.velocity = cglm.glms_vec3_zero();
+isRotatable: bool,
+
+pub fn init(self: *Self) void {
+    self.position = c.glms_vec3_zero();
+    self.velocity = c.glms_vec3_zero();
 
     self.pitch = 0.0;
     self.yaw = 0.0;
@@ -35,26 +32,26 @@ pub export fn jrCamera_init(self: *JrCamera) callconv(.C) void {
     self.isRotatable = false;
 }
 
-pub export fn jrCamera_getRotationMatrix(self: *JrCamera) callconv(.C) cglm.mat4s {
+pub fn getRotationMatrix(self: *Self) c.mat4s {
     const pitchRotation: zmath.Quat = zmath.quatFromNormAxisAngle(zmath.Vec{ 1, 0, 0, 0 }, self.pitch);
     const yawRotation: zmath.Quat = zmath.quatFromNormAxisAngle(zmath.Vec{ 0, -1, 0, 0 }, self.yaw);
 
     const r = zmath.matToArr(zmath.mul(zmath.matFromQuat(pitchRotation), zmath.matFromQuat(yawRotation)));
 
-    return cglm.glms_mat4_make(&r);
+    return c.glms_mat4_make(&r);
 }
 
-pub export fn jrCamera_getViewMatrix(self: *JrCamera) callconv(.C) cglm.mat4s {
+pub fn getViewMatrix(self: *Self) c.mat4s {
     const cameraTranslation: zmath.Mat = zmath.translation(self.position.raw[0], self.position.raw[1], self.position.raw[2]);
-    const cameraRotation: zmath.Mat = zmath.matFromArr(@as(*[16]f32, @ptrCast(@constCast(&jrCamera_getRotationMatrix(self)))).*);
+    const cameraRotation: zmath.Mat = zmath.matFromArr(@as(*[16]f32, @ptrCast(@constCast(&getRotationMatrix(self)))).*);
 
     const r = zmath.matToArr(zmath.inverse(zmath.mul(cameraRotation, cameraTranslation)));
 
-    return cglm.glms_mat4_make(&r);
+    return c.glms_mat4_make(&r);
 }
 
-pub export fn jrCamera_getProjectionMatrix(self: *JrCamera, aspectRatio: f32) callconv(.C) cglm.mat4s {
-    var cameraProjection: zmath.Mat = zmath.perspectiveFovRh(cglm.glm_rad(self.fieldOfView), aspectRatio, 0.001, 10000.0);
+pub fn getProjectionMatrix(self: *Self, aspectRatio: f32) c.mat4s {
+    var cameraProjection: zmath.Mat = zmath.perspectiveFovRh(c.glm_rad(self.fieldOfView), aspectRatio, 0.001, 10000.0);
 
     // invert the Y direction on projection matrix so that we are more similar
     // to opengl and gltf axis
@@ -62,10 +59,10 @@ pub export fn jrCamera_getProjectionMatrix(self: *JrCamera, aspectRatio: f32) ca
 
     const r = zmath.matToArr(cameraProjection);
 
-    return cglm.glms_mat4_make(&r);
+    return c.glms_mat4_make(&r);
 }
 
-pub export fn jrCamera_keyCallback(window: *zglfw.Window, key: zglfw.Key, scancode: c_int, action: zglfw.Action, mods: zglfw.Mods) callconv(.C) void {
+pub fn keyCallback(window: *zglfw.Window, key: zglfw.Key, scancode: c_int, action: zglfw.Action, mods: zglfw.Mods) void {
     _ = scancode;
     _ = mods;
     const self = zglfw.getWindowUserPointer(window, common.JrGlfwUserPointer).?.camera orelse @panic("Problem with key callback");
@@ -105,7 +102,7 @@ pub export fn jrCamera_keyCallback(window: *zglfw.Window, key: zglfw.Key, scanco
 //    try testing.expect(self.velocity.unnamed_0.z == 1);
 //}
 
-pub export fn jrCamera_cursorPositionCallback(window: *zglfw.Window, xpos: f64, ypos: f64) callconv(.C) void {
+pub fn cursorPositionCallback(window: *zglfw.Window, xpos: f64, ypos: f64) void {
     const self = zglfw.getWindowUserPointer(window, common.JrGlfwUserPointer).?.camera orelse @panic("Problem with cursor position callback");
     const static = struct {
         var firstMouse: bool = true;
@@ -136,7 +133,7 @@ pub export fn jrCamera_cursorPositionCallback(window: *zglfw.Window, xpos: f64, 
     static.lastYpos = ypos;
 }
 
-pub export fn jrCamera_mouseButtonCallback(window: *zglfw.Window, button: zglfw.MouseButton, action: zglfw.Action, mods: zglfw.Mods) callconv(.C) void {
+pub fn mouseButtonCallback(window: *zglfw.Window, button: zglfw.MouseButton, action: zglfw.Action, mods: zglfw.Mods) void {
     _ = mods;
     const self = zglfw.getWindowUserPointer(window, common.JrGlfwUserPointer).?.camera orelse @panic("Problem with mouse button callback");
 
@@ -149,7 +146,7 @@ pub export fn jrCamera_mouseButtonCallback(window: *zglfw.Window, button: zglfw.
     }
 }
 
-pub export fn jrCamera_scrollCallback(window: *zglfw.Window, xoffset: f64, yoffset: f64) callconv(.C) void {
+pub fn scrollCallback(window: *zglfw.Window, xoffset: f64, yoffset: f64) void {
     _ = xoffset;
     const self = zglfw.getWindowUserPointer(window, common.JrGlfwUserPointer).?.camera orelse @panic("Problem with scroll callback");
     self.fieldOfView -= @floatCast(yoffset);
@@ -158,9 +155,9 @@ pub export fn jrCamera_scrollCallback(window: *zglfw.Window, xoffset: f64, yoffs
     //if (self.fieldOfView > 180) self.fieldOfView = 180;
 }
 
-pub export fn jrCamera_update(self: *JrCamera, deltaTime: f32) callconv(.C) void {
+pub fn update(self: *Self, deltaTime: f32) void {
     //std.debug.print("({d}, {d}, {d}), ({d}, {d}, {d})\n", .{ self.position.unnamed_0.x, self.position.unnamed_0.y, self.position.unnamed_0.z, self.velocity.unnamed_0.x, self.velocity.unnamed_0.y, self.velocity.unnamed_0.z });
 
-    const cameraRotation: cglm.mat4s = jrCamera_getRotationMatrix(self);
-    self.position = cglm.glms_vec3_add(self.position, cglm.glms_vec4_copy3(FixedCglm.glms_mat4_mulv(cameraRotation, cglm.glms_vec4(cglm.glms_vec3_scale(self.velocity, deltaTime), 0.0))));
+    const cameraRotation: c.mat4s = getRotationMatrix(self);
+    self.position = c.glms_vec3_add(self.position, c.glms_vec4_copy3(FixedCglm.glms_mat4_mulv(cameraRotation, c.glms_vec4(c.glms_vec3_scale(self.velocity, deltaTime), 0.0))));
 }

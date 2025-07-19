@@ -58,6 +58,7 @@ Install the library via vcpkg or zig's build system (see build.zig, build.zig.zo
 - [cglm](https://github.com/recp/cglm)
 - [stb](https://github.com/nothings/stb)
 - [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader)
+- [VulkanMemoryAllocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)
 
 ### Zig build system
 

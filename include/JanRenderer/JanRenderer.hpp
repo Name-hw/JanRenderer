@@ -169,10 +169,9 @@ private:
   VkQueue computeQueue;
 
   VkSwapchainKHR swapChain;
-  std::vector<VkImage> swapChainImages;
+  std::vector<std::unique_ptr<JrImage>> swapChainImages;
   VkFormat swapChainImageFormat;
   VkExtent2D swapChainExtent;
-  std::vector<VkImageView> swapChainImageViews;
   std::vector<VkFramebuffer> swapChainFramebuffers;
 
   VkRenderPass renderPass;
@@ -221,26 +220,24 @@ private:
   std::vector<VkDescriptorSet> computeDescriptorSets;
 
   uint32_t mipLevels;
-  VkImage textureImage;
-  VkDeviceMemory textureImageMemory;
-  VkImageView textureImageView;
+  std::unique_ptr<JrImage> textureImage;
   VkSampler textureSampler;
 
-  VkImage depthImage;
-  VkDeviceMemory depthImageMemory;
-  VkImageView depthImageView;
+  std::unique_ptr<JrImage> depthImage;
 
   VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
-  VkImage colorImage;
-  VkDeviceMemory colorImageMemory;
-  VkImageView colorImageView;
+  std::unique_ptr<JrImage> colorImage;
+  // VkFormat colorFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 
   std::vector<VkBuffer> shaderStorageBuffers;
   std::vector<VkDeviceMemory> shaderStorageBuffersMemory;
 
+  VmaAllocator vmaAllocator;
+
+  // JrObjects
   // HMODULE JrClasses_lib; dynamic loading of JrClasses library (old way)
-  JrVulkanContext *vulkanCtx;
+  JrVulkanContext vulkanCtx;
   JrCamera *camera;
   JrGui *gui;
 
@@ -288,17 +285,13 @@ private:
                   VkBuffer dstBuffer, VkDeviceSize size);
   void createCommandPool(VkCommandPoolCreateFlags flags,
                          uint32_t queueFamilyIndex, VkCommandPool &commandPool);
-  void transitionImageLayout(VkCommandBuffer commandBuffer, VkImage image,
-                             VkFormat format, VkImageLayout oldLayout,
-                             VkImageLayout newLayout, uint32_t mipLevels);
   void copyBufferToImage(const VkCommandBuffer &commandBuffer, VkBuffer buffer,
                          VkImage image, uint32_t width, uint32_t height);
-  VkImageView createImageView(VkImage image, VkFormat format,
-                              VkImageAspectFlags aspectFlags,
-                              uint32_t mipLevels);
   bool hasStencilComponent(VkFormat format);
   VkSampleCountFlagBits getMaxUsableSampleCount();
   VkShaderModule createShaderModule(const std::vector<char> &code);
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   // initVolk
   void initVolk();
@@ -322,6 +315,8 @@ private:
   bool isDeviceSuitable(VkPhysicalDevice physicalDevice_);
   bool checkDeviceExtensionSupport(VkPhysicalDevice physicalDevice_);
   void createLogicalDevice();
+  void createVmaAllocator();
+  void createVulkanContextBeforeCreateSwapChain();
   void createSwapChain();
   SwapChainSupportDetails
   querySwapChainSupport(VkPhysicalDevice physicalDevice_);
@@ -330,13 +325,13 @@ private:
   VkPresentModeKHR chooseSwapPresentMode(
       const std::vector<VkPresentModeKHR> &availablePresentModes);
   VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
-  void createImageViews();
   void createRenderPass();
   void createDescriptorSetLayout();
   void createComputeDescriptorSetLayout();
   void createGraphicsPipeline();
   void createComputePipeline();
   void createCommandPools();
+  void createVulkanContext();
   void createColorResources();
   void createDepthResources();
   VkFormat findDepthFormat();
@@ -347,12 +342,6 @@ private:
   void createTextureImage();
   void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth,
                        int32_t texHeight, uint32_t mipLevels);
-  void createImage(uint32_t width, uint32_t height, uint32_t mipLevels,
-                   VkSampleCountFlagBits numSamples, VkFormat format,
-                   VkImageTiling tiling, VkImageUsageFlags usage,
-                   VkMemoryPropertyFlags properties, VkImage &image,
-                   VkDeviceMemory &imageMemory);
-  void createTextureImageView();
   void createTextureSampler();
   void loadModel();
   void createVertexBuffer();

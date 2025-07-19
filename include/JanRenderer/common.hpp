@@ -1,8 +1,10 @@
 #pragma once
 
-// volk
-#define VK_NO_PROTOTYPES
-#include <volk.h>
+// VolkUsage
+#include "VolkUsage.h"
+
+// VmaUsage
+#include "VmaUsage.h"
 
 // GLFW
 #define VK_USE_PLATFORM_WIN32_KHR

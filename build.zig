@@ -6,7 +6,7 @@ const mem = std.mem;
 const ArrayList = std.ArrayList;
 
 const CSourceFiles: []const []const u8 =
-    &.{ "JanRenderer.cpp", "VolkUsage.cpp" };
+    &.{ "VolkUsage.cpp", "VmaUsage.cpp", "JanRenderer.cpp" };
 const CFlags: []const []const u8 = &.{"-std=c++17"};
 
 const ZigLibs = struct {
@@ -81,86 +81,86 @@ fn addPkg_C(b: *std.Build, pkg_name: []const u8, target: std.Build.ResolvedTarge
     return pkg_lib;
 }
 
-fn findJrObjects(b: *std.Build, absoluteDir: std.fs.Dir) ![][]const u8 {
-    var dir_iterator = absoluteDir.iterate();
+//fn findJrObjects(b: *std.Build, absoluteDir: std.fs.Dir) ![][]const u8 {
+//    var dir_iterator = absoluteDir.iterate();
 
-    var JrObject_fileNameArrayList = std.ArrayList([]const u8).init(b.allocator);
-    defer JrObject_fileNameArrayList.deinit();
+//    var JrObject_fileNameArrayList = std.ArrayList([]const u8).init(b.allocator);
+//    defer JrObject_fileNameArrayList.deinit();
 
-    while (try dir_iterator.next()) |entry| {
-        if (entry.kind == .file and mem.startsWith(u8, entry.name, "Jr")) {
-            try JrObject_fileNameArrayList.append(try b.allocator.dupe(u8, entry.name));
-        }
-    }
+//    while (try dir_iterator.next()) |entry| {
+//        if (entry.kind == .file and mem.startsWith(u8, entry.name, "Jr")) {
+//            try JrObject_fileNameArrayList.append(try b.allocator.dupe(u8, entry.name));
+//        }
+//    }
 
-    const JrObject_fileNames: [][]const u8 = try JrObject_fileNameArrayList.toOwnedSlice();
+//    const JrObject_fileNames: [][]const u8 = try JrObject_fileNameArrayList.toOwnedSlice();
 
-    return JrObject_fileNames;
-}
+//    return JrObject_fileNames;
+//}
 
-fn removeFileExtension(fileName: []const u8) ![]const u8 {
-    const dotIndex = std.mem.lastIndexOfScalar(u8, fileName, '.') orelse fileName.len;
-    return fileName[0..dotIndex];
-}
+//fn removeFileExtension(fileName: []const u8) ![]const u8 {
+//    const dotIndex = std.mem.lastIndexOfScalar(u8, fileName, '.') orelse fileName.len;
+//    return fileName[0..dotIndex];
+//}
 
-fn buildJrObjects(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, step: *std.Build.Step, libs: *const ZigLibs) !ArrayList(*std.Build.Step.Compile) {
-    // current working directory
-    const cwd = fs.cwd();
+//fn buildJrObjects(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, step: *std.Build.Step, libs: *const ZigLibs) !ArrayList(*std.Build.Step.Compile) {
+//    // current working directory
+//    const cwd = fs.cwd();
 
-    // src/JanRenderer/JrObjects/
-    const src_JrObjects_path = b.path("src/JanRenderer/JrObjects/");
-    var src_JrObjects_dir = try cwd.openDir(src_JrObjects_path.getPath(b), .{ .iterate = true });
-    defer src_JrObjects_dir.close();
+//    // src/JanRenderer/JrObjects/
+//    const src_JrObjects_path = b.path("src/JanRenderer/JrObjects/");
+//    var src_JrObjects_dir = try cwd.openDir(src_JrObjects_path.getPath(b), .{ .iterate = true });
+//    defer src_JrObjects_dir.close();
 
-    // src/JanRenderer/JrObjects/Jr*
-    const JrObject_fileNames = findJrObjects(b, src_JrObjects_dir) catch |err| {
-        std.debug.print("Failed to find JrObjects! ({})\n", .{err});
-        return err;
-    };
+//    // src/JanRenderer/JrObjects/Jr*
+//    const JrObject_fileNames = findJrObjects(b, src_JrObjects_dir) catch |err| {
+//        std.debug.print("Failed to find JrObjects! ({})\n", .{err});
+//        return err;
+//    };
 
-    var JrObject_libs = std.ArrayList(*std.Build.Step.Compile).init(b.allocator);
+//    var JrObject_libs = std.ArrayList(*std.Build.Step.Compile).init(b.allocator);
 
-    for (JrObject_fileNames) |JrObject_fileName| {
-        const JrObject_path = src_JrObjects_path.path(b, JrObject_fileName);
+//    for (JrObject_fileNames) |JrObject_fileName| {
+//        const JrObject_path = src_JrObjects_path.path(b, JrObject_fileName);
 
-        const JrObject_lib = b.addStaticLibrary(.{
-            .name = try removeFileExtension(JrObject_fileName),
-            .root_source_file = JrObject_path,
-            .target = target,
-            .optimize = optimize,
-        });
-        // JrObject_lib C source
-        JrObject_lib.linkLibC();
-        JrObject_lib.addIncludePath(b.path("include/"));
-        // JrObject_lib vcpkg library
-        JrObject_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
-        JrObject_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
-        // JrObject_lib zig library
-        JrObject_lib.root_module.addImport("zmath", libs.zmath);
-        JrObject_lib.root_module.addImport("zglfw", libs.zglfw);
-        JrObject_lib.root_module.addImport("zgui", libs.zgui);
+//        const JrObject_lib = b.addStaticLibrary(.{
+//            .name = try removeFileExtension(JrObject_fileName),
+//            .root_source_file = JrObject_path,
+//            .target = target,
+//            .optimize = optimize,
+//        });
+//        // JrObject_lib C source
+//        JrObject_lib.linkLibC();
+//        JrObject_lib.addIncludePath(b.path("include/"));
+//        // JrObject_lib vcpkg library
+//        JrObject_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
+//        JrObject_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+//        // JrObject_lib zig library
+//        JrObject_lib.root_module.addImport("zmath", libs.zmath);
+//        JrObject_lib.root_module.addImport("zglfw", libs.zglfw);
+//        JrObject_lib.root_module.addImport("zgui", libs.zgui);
 
-        // JrObjects.h (unused)
-        // There are many bugs in zig, so use JrObjects.hpp that I created instead of
-        // this automatically generated header file.
-        //const JrObject_lib_header = JrObject_lib.getEmittedH();
-        //JrObject_lib.installHeader(JrObject_lib_header, "");
+//        // JrObjects.h (unused)
+//        // There are many bugs in zig, so use JrObjects.hpp that I created instead of
+//        // this automatically generated header file.
+//        //const JrObject_lib_header = JrObject_lib.getEmittedH();
+//        //JrObject_lib.installHeader(JrObject_lib_header, "");
 
-        const JrObject_lib_installArtifact = b.addInstallArtifact(JrObject_lib, .{});
-        //JrObject_lib_installArtifact.emitted_h = JrObject_lib_header.;
-        step.dependOn(&JrObject_lib_installArtifact.step);
+//        const JrObject_lib_installArtifact = b.addInstallArtifact(JrObject_lib, .{});
+//        //JrObject_lib_installArtifact.emitted_h = JrObject_lib_header.;
+//        step.dependOn(&JrObject_lib_installArtifact.step);
 
-        try JrObject_libs.append(JrObject_lib);
-    }
+//        try JrObject_libs.append(JrObject_lib);
+//    }
 
-    return JrObject_libs;
-}
+//    return JrObject_libs;
+//}
 
-pub fn linkJrObjects(lib: *std.Build.Step.Compile, JrObject_libs: ArrayList(*std.Build.Step.Compile)) !void {
-    for (JrObject_libs.items) |JrObject_lib| {
-        lib.linkLibrary(JrObject_lib);
-    }
-}
+//pub fn linkJrObjects(lib: *std.Build.Step.Compile, JrObject_libs: ArrayList(*std.Build.Step.Compile)) !void {
+//    for (JrObject_libs.items) |JrObject_lib| {
+//        lib.linkLibrary(JrObject_lib);
+//    }
+//}
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
@@ -208,14 +208,32 @@ pub fn build(b: *std.Build) !void {
     lib_step.dependOn(&zglfw_lib.step);
     lib_step.dependOn(&zgui_lib.step);
 
-    const JrObject_libs = buildJrObjects(b, target, optimize, lib_step, &.{
-        .zmath = zmath_module,
-        .zglfw = zglfw_module,
-        .zgui = zgui_module,
-    }) catch |err| {
-        std.debug.print("Failed to build JrObjects! ({})\n", .{err});
-        return err;
-    };
+    const JrObjects_lib = b.addStaticLibrary(.{
+        .name = "JrObjects",
+        .root_source_file = b.path("src/JanRenderer/JrObjects/exports.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    // JrObjects_lib C source
+    JrObjects_lib.linkLibC();
+    JrObjects_lib.addIncludePath(b.path("include/"));
+    // JrObjects_lib vcpkg library
+    JrObjects_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
+    JrObjects_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+    // JrObjects_lib zig library
+    JrObjects_lib.root_module.addImport("zmath", zmath_module);
+    JrObjects_lib.root_module.addImport("zglfw", zglfw_module);
+    JrObjects_lib.root_module.addImport("zgui", zgui_module);
+
+    // JrObjects.h (unused)
+    // There are many bugs in zig, so use JrObjects.hpp that I created instead of
+    // this automatically generated header file.
+    //const JrObject_lib_header = JrObjects_lib.getEmittedH();
+    //JrObjects_lib.installHeader(JrObject_lib_header, "");
+
+    const JrObjects_lib_installArtifact = b.addInstallArtifact(JrObjects_lib, .{});
+    //JrObject_lib_installArtifact.emitted_h = JrObject_lib_header.;
+    lib_step.dependOn(&JrObjects_lib_installArtifact.step);
 
     //// JrObjects_tests
     //const JrObjects_tests = b.addTest(.{
@@ -254,11 +272,7 @@ pub fn build(b: *std.Build) !void {
     JanRenderer_lib.linkLibrary(zglfw_lib);
     JanRenderer_lib.linkLibrary(zgui_lib);
     JanRenderer_lib.addIncludePath(zgui.path("libs/imgui"));
-
-    linkJrObjects(JanRenderer_lib, JrObject_libs) catch |err| {
-        std.debug.print("Failed to link JrObjects with JanRenderer! ({})\n", .{err});
-        return err;
-    };
+    JanRenderer_lib.linkLibrary(JrObjects_lib);
 
     const lib_installArtifact = b.addInstallArtifact(JanRenderer_lib, .{});
 
@@ -280,12 +294,14 @@ pub fn build(b: *std.Build) !void {
     TestApp_exe.addIncludePath(b.path("zig-out/include/"));
     TestApp_exe.addLibraryPath(b.path("zig-out/lib/"));
     TestApp_exe.linkLibrary(JanRenderer_lib);
+    TestApp_exe.linkLibrary(JrObjects_lib);
 
     const exe_installArtifact = b.addInstallArtifact(TestApp_exe, .{});
 
     const exe_step = b.step("exe", "Run the executable build step");
     exe_step.dependOn(&zglfw_lib.step);
     exe_step.dependOn(&zgui_lib.step);
+    exe_step.dependOn(&JrObjects_lib_installArtifact.step);
     exe_step.dependOn(&exe_installArtifact.step);
 
     b.getInstallStep().dependOn(lib_step);

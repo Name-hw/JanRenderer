@@ -1,7 +1,5 @@
-const cglm = @cImport({
-    @cDefine("CGLM_FORCE_DEPTH_ZERO_TO_ONE", "");
-    @cInclude("cglm/struct.h");
-});
+const common = @import("../common.zig");
+const cglm = common.c;
 
 pub const GLM_MAT4_IDENTITY_INIT = [4][4]f32{ [4]f32{ 1.0, 0.0, 0.0, 0.0 }, [4]f32{ 0.0, 1.0, 0.0, 0.0 }, [4]f32{ 0.0, 0.0, 1.0, 0.0 }, [4]f32{ 0.0, 0.0, 0.0, 1.0 } };
 pub const GLM_MAT4_ZERO_INIT = [4][4]f32{ [4]f32{ 0.0, 0.0, 0.0, 0.0 }, [4]f32{ 0.0, 0.0, 0.0, 0.0 }, [4]f32{ 0.0, 0.0, 0.0, 0.0 }, [4]f32{ 0.0, 0.0, 0.0, 0.0 } };
