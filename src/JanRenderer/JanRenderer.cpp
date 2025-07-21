@@ -454,13 +454,14 @@ void JanRenderer::initVulkan() {
   createSurface();
   pickPhysicalDevice();
   createLogicalDevice();
-  createVmaAllocator();
   createVulkanContextBeforeCreateSwapChain();
+  createAllocators();
   createSwapChain();
   createDescriptorSetLayout();
   createComputeDescriptorSetLayout();
   createGraphicsPipeline();
   createComputePipeline();
+  createShaderObjects();
   createCommandPools();
   createVulkanContext();
   createColorResources();
@@ -479,6 +480,8 @@ void JanRenderer::initVulkan() {
   createComputeDescriptorPool();
   createComputeDescriptorSets();
   createComputeCommandBuffers();
+
+  createTransitionCommandBuffers();
 
   createSyncObjects();
 }
@@ -686,9 +689,15 @@ void JanRenderer::createLogicalDevice() {
   deviceFeatures.sampleRateShading =
       VK_TRUE; // enable sample shading feature for the device
 
+  VkPhysicalDeviceShaderObjectFeaturesEXT shaderObjectFeatures{};
+  shaderObjectFeatures.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT;
+  shaderObjectFeatures.shaderObject = VK_TRUE;
+
   VkPhysicalDeviceVulkan12Features vulkan12Features{};
   vulkan12Features.sType =
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  vulkan12Features.pNext = &shaderObjectFeatures;
   vulkan12Features.bufferDeviceAddress = VK_TRUE;
   vulkan12Features.descriptorIndexing = VK_TRUE;
 
@@ -698,9 +707,15 @@ void JanRenderer::createLogicalDevice() {
   vulkan13Features.pNext = &vulkan12Features;
   vulkan13Features.dynamicRendering = VK_TRUE;
 
+  VkPhysicalDeviceVulkan14Features vulkan14Features{};
+  vulkan14Features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
+  vulkan14Features.pNext = &vulkan13Features;
+  vulkan14Features.vertexAttributeInstanceRateZeroDivisor = VK_TRUE;
+
   VkPhysicalDeviceFeatures2 deviceFeatures2{};
   deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  deviceFeatures2.pNext = &vulkan13Features;
+  deviceFeatures2.pNext = &vulkan14Features;
   deviceFeatures2.features = deviceFeatures;
 
   VkDeviceCreateInfo createInfo{};
@@ -742,25 +757,6 @@ void JanRenderer::createLogicalDevice() {
   vkGetDeviceQueue(device, queueFamilyIndices.computeFamily, 0, &computeQueue);
 }
 
-// initVulkan createVmaAllocator
-void JanRenderer::createVmaAllocator() {
-
-  VmaAllocatorCreateInfo allocatorCreateInfo = {};
-  allocatorCreateInfo.physicalDevice = physicalDevice;
-  allocatorCreateInfo.device = device;
-  allocatorCreateInfo.instance = instance;
-  allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
-
-  VmaVulkanFunctions vulkanFunctions;
-  vmaImportVulkanFunctionsFromVolk(&allocatorCreateInfo, &vulkanFunctions);
-
-  allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
-
-  if (vmaCreateAllocator(&allocatorCreateInfo, &vmaAllocator) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to create VMA allocator!");
-  }
-}
-
 // initVulkan createVulkanContextBeforeCreateSwapChain
 void JanRenderer::createVulkanContextBeforeCreateSwapChain() {
   vulkanCtx = JrVulkanContext{
@@ -772,8 +768,16 @@ void JanRenderer::createVulkanContextBeforeCreateSwapChain() {
       .presentQueue = &presentQueue,
       .transferQueue = &transferQueue,
       .computeQueue = &computeQueue,
-      .vmaAllocator = &vmaAllocator,
   };
+}
+
+// initVulkan createAllocators
+void JanRenderer::createAllocators() {
+  allocator = std::make_unique<JrAllocator>();
+  allocator->vulkanCtx = &vulkanCtx;
+  allocator->vmaAllocator = new VmaAllocator;
+
+  jrAllocator_init(allocator.get());
 }
 
 // initVulkan createSwapChain
@@ -1032,9 +1036,9 @@ void JanRenderer::createGraphicsPipeline() {
   vertexInputInfo.sType =
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
   vertexInputInfo.vertexBindingDescriptionCount = 1;
+  vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
   vertexInputInfo.vertexAttributeDescriptionCount =
       static_cast<uint32_t>(attributeDescriptions.size());
-  vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
   vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
   VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -1067,31 +1071,29 @@ void JanRenderer::createGraphicsPipeline() {
   rasterizer.depthClampEnable = VK_FALSE;
   rasterizer.rasterizerDiscardEnable = VK_FALSE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-  rasterizer.lineWidth = 1.0f;
   rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.depthBiasEnable = VK_FALSE;
   rasterizer.depthBiasConstantFactor = 0.0f; // Optional
   rasterizer.depthBiasClamp = 0.0f;          // Optional
   rasterizer.depthBiasSlopeFactor = 0.0f;    // Optional
+  rasterizer.lineWidth = 1.0f;
 
   VkPipelineMultisampleStateCreateInfo multisampling{};
   multisampling.sType =
       VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+  multisampling.rasterizationSamples = msaaSamples;
   multisampling.sampleShadingEnable =
       VK_TRUE; // enable sample shading in the pipeline
   multisampling.minSampleShading =
       .2f; // min fraction for sample shading; closer to one is smooth
   // multisampling.minSampleShading = 1.0f; // Optional
-  multisampling.rasterizationSamples = msaaSamples;
   multisampling.pSampleMask = nullptr;            // Optional
   multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
   multisampling.alphaToOneEnable = VK_FALSE;      // Optional
 
   VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-  colorBlendAttachment.colorWriteMask =
-      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
   colorBlendAttachment.blendEnable = VK_TRUE;
   colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
   colorBlendAttachment.dstColorBlendFactor =
@@ -1100,6 +1102,9 @@ void JanRenderer::createGraphicsPipeline() {
   colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
   colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
   colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+  colorBlendAttachment.colorWriteMask =
+      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
   VkPipelineColorBlendStateCreateInfo colorBlending{};
   colorBlending.sType =
@@ -1113,8 +1118,10 @@ void JanRenderer::createGraphicsPipeline() {
   colorBlending.blendConstants[2] = 0.0f; // Optional
   colorBlending.blendConstants[3] = 0.0f; // Optional
 
-  std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT,
-                                               VK_DYNAMIC_STATE_SCISSOR};
+  std::vector<VkDynamicState> dynamicStates = {
+      VK_DYNAMIC_STATE_VIEWPORT,
+      VK_DYNAMIC_STATE_SCISSOR,
+  };
   VkPipelineDynamicStateCreateInfo dynamicState{};
   dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
   dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
@@ -1139,11 +1146,11 @@ void JanRenderer::createGraphicsPipeline() {
   depthStencil.depthWriteEnable = VK_TRUE;
   depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
   depthStencil.depthBoundsTestEnable = VK_FALSE;
+  depthStencil.stencilTestEnable = VK_FALSE;
+  depthStencil.front = {};            // Optional
+  depthStencil.back = {};             // Optional
   depthStencil.minDepthBounds = 0.0f; // Optional
   depthStencil.maxDepthBounds = 1.0f; // Optional
-  depthStencil.stencilTestEnable = VK_FALSE;
-  depthStencil.front = {}; // Optional
-  depthStencil.back = {};  // Optional
 
   // Provide information for dynamic rendering
   VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
@@ -1222,10 +1229,42 @@ void JanRenderer::createComputePipeline() {
   vkDestroyShaderModule(device, computeShaderModule, nullptr);
 }
 
+// initVulkan createShaderObjects
+void JanRenderer::createShaderObjects() {
+  auto particleVertShaderCode = readFile("assets/shaders/particle.vert.spv");
+  auto particleFragShaderCode = readFile("assets/shaders/particle.frag.spv");
+
+  particleVertShader = std::make_unique<JrShader>();
+  particleVertShader->vulkanCtx = &vulkanCtx;
+  particleVertShader->spirv = ZigSlice<uint32_t>{
+      reinterpret_cast<uint32_t *>(particleVertShaderCode.data()),
+      particleVertShaderCode.size() / sizeof(uint32_t),
+  };
+
+  particleVertShader->shaderStage = VK_SHADER_STAGE_VERTEX_BIT;
+
+  jrShader_init(particleVertShader.get(), VK_SHADER_STAGE_FRAGMENT_BIT, 1,
+                &descriptorSetLayout, 0, nullptr);
+
+  particleFragShader = std::make_unique<JrShader>();
+  particleFragShader->vulkanCtx = &vulkanCtx;
+  particleFragShader->spirv = ZigSlice<uint32_t>{
+      reinterpret_cast<uint32_t *>(particleFragShaderCode.data()),
+      particleFragShaderCode.size() / sizeof(uint32_t),
+  };
+  particleFragShader->shaderStage = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+  jrShader_init(particleFragShader.get(), 0, 1, &descriptorSetLayout, 0,
+                nullptr);
+
+  jrShader_buildLinkedShaders(particleVertShader.get(),
+                              particleFragShader.get());
+}
+
 // initVulkan createCommandPools
 void JanRenderer::createCommandPools() {
   createCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                    queueFamilyIndices.graphicsFamily, commandPool);
+                    queueFamilyIndices.graphicsFamily, graphicsCommandPool);
   createCommandPool(VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
                     queueFamilyIndices.transferFamily, transferCommandPool);
   createCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
@@ -1239,6 +1278,9 @@ void JanRenderer::createVulkanContext() {
       uniquePtrVectorToRawPtrArrayPtr<JrImage, 3>(swapChainImages);
   vulkanCtx.swapchainFormat = &swapChainImageFormat;
   vulkanCtx.swapchainExtent = &swapChainExtent;
+  vulkanCtx.graphicsCommandPool = &graphicsCommandPool;
+  vulkanCtx.transferCommandPool = &transferCommandPool;
+  vulkanCtx.computeCommandPool = &computeCommandPool;
 }
 
 // initVulkan createColorResources
@@ -1267,7 +1309,12 @@ void JanRenderer::createColorResources() {
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   colorImage->imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-  jrImage_init(colorImage.get(), VK_IMAGE_TILING_OPTIMAL);
+  jrImage_init(colorImage.get(), allocator.get(), VK_IMAGE_TILING_OPTIMAL);
+
+  VkCommandBuffer commandBuffer = beginSingleTimeCommands(graphicsCommandPool);
+  jrImage_transitionImageLayout(colorImage.get(), commandBuffer,
+                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  endSingleTimeCommands(graphicsQueue, graphicsCommandPool, commandBuffer);
 }
 
 // initVulkan createDepthResources
@@ -1295,7 +1342,13 @@ void JanRenderer::createDepthResources() {
   depthImage->imageUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
   depthImage->imageAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-  jrImage_init(depthImage.get(), VK_IMAGE_TILING_OPTIMAL);
+  jrImage_init(depthImage.get(), allocator.get(), VK_IMAGE_TILING_OPTIMAL);
+
+  VkCommandBuffer commandBuffer = beginSingleTimeCommands(graphicsCommandPool);
+  jrImage_transitionImageLayout(
+      depthImage.get(), commandBuffer,
+      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+  endSingleTimeCommands(graphicsQueue, graphicsCommandPool, commandBuffer);
 }
 
 // initVulkan createDepthResources findDepthFormat
@@ -1383,7 +1436,7 @@ void JanRenderer::createTextureImage() {
                              VK_IMAGE_USAGE_SAMPLED_BIT;
   textureImage->imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-  jrImage_init(textureImage.get(), VK_IMAGE_TILING_OPTIMAL);
+  jrImage_init(textureImage.get(), allocator.get(), VK_IMAGE_TILING_OPTIMAL);
 
   std::vector<VkCommandBuffer> commandBuffers =
       setupCommandBuffer(transferCommandPool, 2);
@@ -1420,7 +1473,7 @@ void JanRenderer::generateMipmaps(VkImage image, VkFormat imageFormat,
         "texture image format does not support linear blitting!");
   }
 
-  VkCommandBuffer commandBuffer = beginSingleTimeCommands(commandPool);
+  VkCommandBuffer commandBuffer = beginSingleTimeCommands(graphicsCommandPool);
 
   VkImageMemoryBarrier barrier{};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1490,7 +1543,7 @@ void JanRenderer::generateMipmaps(VkImage image, VkFormat imageFormat,
                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0,
                        nullptr, 1, &barrier);
 
-  endSingleTimeCommands(graphicsQueue, commandPool, commandBuffer);
+  endSingleTimeCommands(graphicsQueue, graphicsCommandPool, commandBuffer);
 }
 
 // initVulkan createTextureSampler
@@ -1741,7 +1794,7 @@ void JanRenderer::createCommandBuffers() {
 
   VkCommandBufferAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocInfo.commandPool = commandPool;
+  allocInfo.commandPool = graphicsCommandPool;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
 
@@ -1764,22 +1817,23 @@ void JanRenderer::createShaderStorageBuffers() {
     float theta = rndDist(rndEngine) * 2 * 3.14159265358979323846;
     float x = r * cos(theta) * height / width;
     float y = r * sin(theta);
-    particle.position = {x, y};
-    particle.velocity = glms_vec2_scale(glms_vec2_normalize({x, y}), 0.00025f);
+    float z = r * cos(theta) * height / width;
+    particle.position = {x, y, z};
+    particle.velocity = glms_vec3_scale(glms_vec3_normalize({x, y}), 0.00025f);
     particle.color = {rndDist(rndEngine), rndDist(rndEngine),
                       rndDist(rndEngine), 1.0f};
   }
 
   VkDeviceSize bufferSize = sizeof(Particle) * PARTICLE_COUNT;
 
-  uint32_t indices[] = {
-      queueFamilyIndices.computeFamily,
+  uint32_t stagingBufferQueueFamilyIndices[] = {
       queueFamilyIndices.transferFamily,
+      queueFamilyIndices.computeFamily,
   };
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingBufferMemory;
   createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-               VK_SHARING_MODE_CONCURRENT, indices,
+               VK_SHARING_MODE_CONCURRENT, stagingBufferQueueFamilyIndices,
                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                stagingBuffer, stagingBufferMemory);
@@ -1789,6 +1843,10 @@ void JanRenderer::createShaderStorageBuffers() {
   memcpy(data, particles.data(), (size_t)bufferSize);
   vkUnmapMemory(device, stagingBufferMemory);
 
+  uint32_t shaderStorageBuffersQueueFamilyIndices[] = {
+      queueFamilyIndices.graphicsFamily,
+      queueFamilyIndices.computeFamily,
+  };
   shaderStorageBuffers.resize(MAX_FRAMES_IN_FLIGHT);
   shaderStorageBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -1797,8 +1855,9 @@ void JanRenderer::createShaderStorageBuffers() {
         bufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
             VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_SHARING_MODE_EXCLUSIVE, indices, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        shaderStorageBuffers[i], shaderStorageBuffersMemory[i]);
+        VK_SHARING_MODE_CONCURRENT, shaderStorageBuffersQueueFamilyIndices,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, shaderStorageBuffers[i],
+        shaderStorageBuffersMemory[i]);
     // Copy data from the staging buffer (host) to the shader storage buffer
     // (GPU)
     copyBuffer(computeQueue, computeCommandPool, stagingBuffer,
@@ -1909,11 +1968,28 @@ void JanRenderer::createComputeCommandBuffers() {
   }
 }
 
+// initVulkan createTransitionCommandBuffers
+void JanRenderer::createTransitionCommandBuffers() {
+  transitionCommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
+  VkCommandBufferAllocateInfo allocInfo{};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.commandPool = graphicsCommandPool;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandBufferCount = (uint32_t)transitionCommandBuffers.size();
+
+  if (vkAllocateCommandBuffers(device, &allocInfo,
+                               transitionCommandBuffers.data()) != VK_SUCCESS) {
+    throw std::runtime_error("failed to allocate command buffers!");
+  }
+}
+
 // initVulkan createSyncObjects
 void JanRenderer::createSyncObjects() {
   imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-  renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
   computeFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+  renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+  presentReadySemaphores.resize(swapChainImages.size());
   inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
   computeInFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -1933,7 +2009,7 @@ void JanRenderer::createSyncObjects() {
             VK_SUCCESS) {
 
       throw std::runtime_error(
-          "failed to create synchronization objects for a frame!");
+          "Failed to create graphics synchronization objects for a frame!");
     }
 
     if (vkCreateSemaphore(device, &semaphoreInfo, nullptr,
@@ -1941,7 +2017,15 @@ void JanRenderer::createSyncObjects() {
         vkCreateFence(device, &fenceInfo, nullptr, &computeInFlightFences[i]) !=
             VK_SUCCESS) {
       throw std::runtime_error(
-          "failed to create compute synchronization objects for a frame!");
+          "Failed to create compute synchronization objects for a frame!");
+    }
+  }
+
+  for (size_t i = 0; i < swapChainImages.size(); i++) {
+    if (vkCreateSemaphore(device, &semaphoreInfo, nullptr,
+                          &presentReadySemaphores[i]) != VK_SUCCESS) {
+      throw std::runtime_error(
+          "Failed to create graphics synchronization objects for a frame!");
     }
   }
 }
@@ -1966,7 +2050,7 @@ void JanRenderer::initGui() {
   gui->window = window;
   gui->viewModel = guiViewModel;
 
-  jrGui_init(gui);
+  jrGui_init(gui, allocator.get());
 };
 
 // mainLoop
@@ -1991,12 +2075,11 @@ void JanRenderer::updateDeltaTime() {
 
 // mainLoop drawFrame
 void JanRenderer::drawFrame() {
+  // Compute submission
   vkWaitForFences(device, 1, &computeInFlightFences[currentFrame], VK_TRUE,
                   UINT64_MAX);
 
   updateUniformBuffer(currentFrame);
-
-  // Compute submission
 
   vkResetFences(device, 1, &computeInFlightFences[currentFrame]);
 
@@ -2014,7 +2097,7 @@ void JanRenderer::drawFrame() {
 
   if (vkQueueSubmit(computeQueue, 1, &computeSubmitInfo,
                     computeInFlightFences[currentFrame]) != VK_SUCCESS) {
-    throw std::runtime_error("failed to submit compute command buffer!");
+    throw std::runtime_error("Failed to submit compute command buffer!");
   };
 
   // Graphics submission
@@ -2063,14 +2146,29 @@ void JanRenderer::drawFrame() {
     throw std::runtime_error("failed to submit draw command buffer!");
   }
 
-  jrGui_render(gui, imageIndex, 1, signalSemaphores,
-               inFlightFences[currentFrame]);
+  jrGui_render(gui, imageIndex, 1, signalSemaphores, nullptr);
 
+  // Transition for presentation
+  ZigSlice<VkSemaphore> transitionWaitSemaphores =
+      ZigSlice<VkSemaphore>{&gui->renderFinishedSemaphores[currentFrame], 1};
+  VkPipelineStageFlags transitionWaitStages[] = {
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
+  ZigSlice<VkSemaphore> transitionSignalSemaphores =
+      ZigSlice<VkSemaphore>{&presentReadySemaphores[imageIndex], 1};
+
+  vkResetCommandBuffer(transitionCommandBuffers[currentFrame], 0);
+  jrImage_transitionImageLayoutWithQueueSubmit(
+      swapChainImages[imageIndex].get(), transitionCommandBuffers[currentFrame],
+      VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, &transitionWaitSemaphores,
+      transitionWaitStages, &transitionSignalSemaphores,
+      inFlightFences[currentFrame]);
+
+  // Presentation
   VkSwapchainKHR swapChains[] = {swapChain};
   VkPresentInfoKHR presentInfo{};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
   presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores = &gui->renderFinishedSemaphores[currentFrame];
+  presentInfo.pWaitSemaphores = &presentReadySemaphores[imageIndex];
   presentInfo.swapchainCount = 1;
   presentInfo.pSwapchains = swapChains;
   presentInfo.pImageIndices = &imageIndex;
@@ -2103,27 +2201,36 @@ void JanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
     throw std::runtime_error("failed to begin recording command buffer!");
   }
 
+  VkBufferMemoryBarrier barrier{};
+  barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  barrier.srcAccessMask =
+      VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+  barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.buffer = shaderStorageBuffers[currentFrame];
+  barrier.offset = 0;
+  barrier.size = sizeof(Particle) * PARTICLE_COUNT;
+  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                       VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1,
+                       &barrier, 0, nullptr);
+
   // Dynamic rendering
-  jrImage_transitionImageLayout(colorImage.get(), commandBuffer,
-                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   jrImage_transitionImageLayout(swapChainImages[imageIndex].get(),
                                 commandBuffer,
                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  jrImage_transitionImageLayout(
-      depthImage.get(), commandBuffer,
-      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
   VkRenderingAttachmentInfo colorAttachmentInfo{};
   colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
   colorAttachmentInfo.imageView = colorImage->imageView;
   colorAttachmentInfo.imageLayout = colorImage->imageLayout;
-  colorAttachmentInfo.resolveMode = VK_RESOLVE_MODE_NONE;
+  colorAttachmentInfo.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
   colorAttachmentInfo.resolveImageView = swapChainImages[imageIndex]->imageView;
   colorAttachmentInfo.resolveImageLayout =
       swapChainImages[imageIndex]->imageLayout;
   colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  colorAttachmentInfo.clearValue.color = {0.0f, 0.0f, 0.0f, 1.0f};
+  colorAttachmentInfo.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
 
   VkRenderingAttachmentInfo depthAttachmentInfo{};
   depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -2174,7 +2281,54 @@ void JanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
   vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0,
                    0, 0);
 
-  // SSBO
+  // Particle rendering
+  // vertexInput
+  auto bindingDescription = Particle::getBindingDescription();
+  auto attributeDescriptions = Particle::getAttributeDescriptions();
+  vkCmdSetVertexInputEXT(commandBuffer, 1, &bindingDescription,
+                         (uint32_t)attributeDescriptions.size(),
+                         attributeDescriptions.data());
+  // inputAssembly
+  vkCmdSetPrimitiveTopologyEXT(commandBuffer, VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
+  vkCmdSetPrimitiveRestartEnableEXT(commandBuffer, VK_FALSE);
+  // viewportState
+  vkCmdSetViewportWithCountEXT(commandBuffer, 1, &viewport);
+  vkCmdSetScissorWithCountEXT(commandBuffer, 1, &scissor);
+  // rasterizer
+  vkCmdSetRasterizerDiscardEnableEXT(commandBuffer, VK_FALSE);
+  vkCmdSetPolygonModeEXT(commandBuffer, VK_POLYGON_MODE_FILL);
+  vkCmdSetCullModeEXT(commandBuffer, VK_CULL_MODE_BACK_BIT);
+  vkCmdSetFrontFaceEXT(commandBuffer, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+  vkCmdSetDepthBiasEnableEXT(commandBuffer, VK_FALSE);
+  // multisampling
+  VkSampleMask sampleMask = 0;
+  vkCmdSetRasterizationSamplesEXT(commandBuffer, msaaSamples);
+  vkCmdSetSampleMaskEXT(commandBuffer, msaaSamples, &sampleMask);
+  vkCmdSetAlphaToCoverageEnableEXT(commandBuffer, VK_FALSE);
+  // depthStencil
+  vkCmdSetDepthTestEnableEXT(commandBuffer, VK_TRUE);
+  vkCmdSetDepthWriteEnableEXT(commandBuffer, VK_TRUE);
+  vkCmdSetDepthCompareOpEXT(commandBuffer, VK_COMPARE_OP_LESS);
+  vkCmdSetStencilTestEnableEXT(commandBuffer, VK_FALSE);
+  // colorBlending
+  VkBool32 colorBlendEnable = VK_TRUE;
+  VkColorBlendEquationEXT colorBlendEquation;
+  colorBlendEquation.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+  colorBlendEquation.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+  colorBlendEquation.colorBlendOp = VK_BLEND_OP_ADD;
+  colorBlendEquation.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+  colorBlendEquation.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+  colorBlendEquation.alphaBlendOp = VK_BLEND_OP_ADD;
+  VkColorComponentFlags colorWriteMask =
+      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  vkCmdSetColorBlendEnableEXT(commandBuffer, 0, 1, &colorBlendEnable);
+  vkCmdSetColorBlendEquationEXT(commandBuffer, 0, 1, &colorBlendEquation);
+  vkCmdSetColorWriteMaskEXT(commandBuffer, 0, 1, &colorWriteMask);
+
+  jrShader_bindShader(particleVertShader.get(), commandBuffer);
+  jrShader_bindShader(particleFragShader.get(), commandBuffer);
+
   vkCmdBindVertexBuffers(commandBuffer, 0, 1,
                          &shaderStorageBuffers[currentFrame], offsets);
 
@@ -2183,17 +2337,10 @@ void JanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
   // jrImage_copyToImage(colorImage, swapChainImages[imageIndex],
   // commandBuffer);
 
-  vkCmdEndRenderingKHR(commandBuffer);
-
-  jrImage_transitionImageLayout(colorImage.get(), commandBuffer,
-                                VK_IMAGE_LAYOUT_UNDEFINED);
-  jrImage_transitionImageLayout(swapChainImages[imageIndex].get(),
-                                commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED);
-  jrImage_transitionImageLayout(depthImage.get(), commandBuffer,
-                                VK_IMAGE_LAYOUT_UNDEFINED);
+  vkCmdEndRendering(commandBuffer);
 
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-    throw std::runtime_error("failed to record command buffer!");
+    throw std::runtime_error("Failed to record command buffer!");
   }
 }
 
@@ -2209,6 +2356,21 @@ void JanRenderer::recordComputeCommandBuffer(
     throw std::runtime_error("failed to begin recording command buffer!");
   }
 
+  VkBufferMemoryBarrier barrier{};
+  barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  barrier.srcAccessMask = 0;
+  barrier.dstAccessMask =
+      VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.buffer = shaderStorageBuffers[currentFrame];
+  barrier.offset = 0;
+  barrier.size = sizeof(Particle) * PARTICLE_COUNT;
+  vkCmdPipelineBarrier(computeCommandBuffer,
+                       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1,
+                       &barrier, 0, nullptr);
+
   vkCmdBindPipeline(computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                     computePipeline);
   vkCmdBindDescriptorSets(computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -2218,7 +2380,7 @@ void JanRenderer::recordComputeCommandBuffer(
   vkCmdDispatch(computeCommandBuffer, PARTICLE_COUNT / 256, 1, 1);
 
   if (vkEndCommandBuffer(computeCommandBuffer) != VK_SUCCESS) {
-    throw std::runtime_error("failed to record compute command buffer!");
+    throw std::runtime_error("Failed to record compute command buffer!");
   }
 }
 
@@ -2238,8 +2400,8 @@ void JanRenderer::updateUniformBuffer(uint32_t currentImage) {
   //     glms_lookat({2.0f, 2.0f, 2.0f}, {0.0f, 0.0f, 0.0f}, {0.0f,
   //     0.0f, 1.0f});
   // ubo.proj = glms_perspective(
-  //     glm_rad(45.0f), swapChainExtent.width / (float)swapChainExtent.height,
-  //     0.1f, 10.0f);
+  //     glm_rad(45.0f), swapChainExtent.width /
+  //     (float)swapChainExtent.height, 0.1f, 10.0f);
   // ubo.proj.raw[1][1] *= -1;
 
   UniformBufferObject ubo{};
@@ -2273,7 +2435,7 @@ void JanRenderer::recreateSwapChain() {
 void JanRenderer::cleanup() {
   free(applicationName);
 
-  jrGui_destroy(gui);
+  jrGui_deinit(gui);
 
   cleanupSwapChain();
 
@@ -2282,8 +2444,11 @@ void JanRenderer::cleanup() {
   vkDestroyPipeline(device, computePipeline, nullptr);
   vkDestroyPipelineLayout(device, computePipelineLayout, nullptr);
 
+  jrShader_destroy(particleVertShader.get());
+  jrShader_destroy(particleFragShader.get());
+
   vkDestroySampler(device, textureSampler, nullptr);
-  jrImage_destroy(textureImage.get());
+  jrImage_deinit(textureImage.get(), allocator.get());
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vkDestroyBuffer(device, uniformBuffers[i], nullptr);
@@ -2307,18 +2472,19 @@ void JanRenderer::cleanup() {
   }
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
     vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
     vkDestroySemaphore(device, computeFinishedSemaphores[i], nullptr);
+    vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+
     vkDestroyFence(device, inFlightFences[i], nullptr);
     vkDestroyFence(device, computeInFlightFences[i], nullptr);
   }
 
-  vkDestroyCommandPool(device, commandPool, nullptr);
+  vkDestroyCommandPool(device, graphicsCommandPool, nullptr);
   vkDestroyCommandPool(device, transferCommandPool, nullptr);
   vkDestroyCommandPool(device, computeCommandPool, nullptr);
 
-  vmaDestroyAllocator(vmaAllocator);
+  jrAllocator_deinit(allocator.get());
 
   vkDestroyDevice(device, nullptr);
 
@@ -2336,8 +2502,8 @@ void JanRenderer::cleanup() {
 
 // cleanup cleanupSwapChain
 void JanRenderer::cleanupSwapChain() {
-  jrImage_destroy(colorImage.get());
-  jrImage_destroy(depthImage.get());
+  jrImage_deinit(colorImage.get(), allocator.get());
+  jrImage_deinit(depthImage.get(), allocator.get());
 
   for (size_t i = 0; i < swapChainImages.size(); i++) {
     vkDestroyImageView(device, swapChainImages[i]->imageView, nullptr);

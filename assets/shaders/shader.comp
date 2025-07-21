@@ -1,39 +1,51 @@
 #version 450
 
-layout (binding = 0) uniform ParameterUBO {
-    float deltaTime;
+layout (binding = 0) uniform UniformBufferObject {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
 } ubo;
 
 struct Particle {
-    vec2 position;
-    vec2 velocity;
+    vec4 position;
+    vec3 velocity;
     vec4 color;
 };
 
 layout(std140, binding = 1) readonly buffer ParticleSSBOIn {
-   Particle particlesIn[ ];
+   Particle particlesIn[];
 };
 
 layout(std140, binding = 2) buffer ParticleSSBOOut {
-   Particle particlesOut[ ];
+   Particle particlesOut[];
 };
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-void main() 
+const vec3 offset = vec3(0.0, 0.0, 0.0);
+const vec3 size = vec3(1.0, 1.0, 1.0);
+const float deltaTime = 0.016; // Assuming 60 FPS, adjust as necessary
+
+void main()
 {
     uint index = gl_GlobalInvocationID.x;  
 
     Particle particleIn = particlesIn[index];
+    Particle particleOut = particlesOut[index];
 
-    particlesOut[index].position = particleIn.position + particleIn.velocity.xy * ubo.deltaTime;
-    particlesOut[index].velocity = particleIn.velocity;
+    vec3 nextPosition = vec3(particleIn.position) + particleIn.velocity * deltaTime + offset;
+
+    particleOut.position =  ubo.proj * ubo.view * ubo.model * vec4(nextPosition, 1.0);
+    particleOut.velocity = particleIn.velocity;
 
     // Flip movement at window border
-    if ((particlesOut[index].position.x <= -1.0) || (particlesOut[index].position.x >= 1.0)) {
-        particlesOut[index].velocity.x = -particlesOut[index].velocity.x;
+    if (((particleOut.position.x - offset.x) <= -size.x/2) || ((particleOut.position.x - offset.x) >= size.x/2)) {
+        particleOut.velocity.x = -particleOut.velocity.x;
     }
-    if ((particlesOut[index].position.y <= -1.0) || (particlesOut[index].position.y >= 1.0)) {
-        particlesOut[index].velocity.y = -particlesOut[index].velocity.y;
+    if (((particleOut.position.y - offset.y) <= -size.y/2) || ((particleOut.position.y - offset.y) >= size.y/2)) {
+        particleOut.velocity.y = -particleOut.velocity.y;
+    }
+    if (((particleOut.position.z - offset.z) <= -size.z/2) || ((particleOut.position.z - offset.z) >= size.z/2)) {
+        particleOut.velocity.z = -particleOut.velocity.z;
     }
 }

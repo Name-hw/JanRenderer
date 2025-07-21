@@ -14,7 +14,7 @@ https://github.com/user-attachments/assets/17ed007a-4180-4430-8240-73fc46285b80
 - Generate Mipmaps
 - MSAA (MultiSampling Anti-Aliasing) support
 - Compute Shader
-- Flexible graphics pipeline with Vulkan dynamic rendering
+- Flexible graphics pipeline with Vulkan dynamic rendering and shader objects
 
 ## **Getting Started**
 
