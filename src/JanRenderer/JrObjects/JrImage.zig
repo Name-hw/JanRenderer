@@ -2,6 +2,7 @@ const std = @import("std");
 const zmath = @import("zmath");
 const common = @import("common.zig");
 const c = common.c;
+const JrAllocator = @import("JrAllocator.zig");
 const JrVulkanContext = @import("JrVulkanContext.zig");
 
 const Self = @This();
@@ -19,8 +20,8 @@ image_sample_count: c.VkSampleCountFlagBits,
 image_usage: c.VkImageUsageFlags,
 image_aspect_mask: c.VkImageAspectFlags,
 
-pub fn init(self: *Self, tiling: c.VkImageTiling) void {
-    self.createImage(tiling);
+pub fn init(self: *Self, allocator: *JrAllocator, tiling: c.VkImageTiling) void {
+    self.createImage(allocator, tiling);
     self.createImageView();
 }
 
@@ -28,7 +29,7 @@ pub fn init_from_swapchain(self: *Self) void {
     self.createImageView();
 }
 
-pub fn createImage(self: *Self, tiling: c.VkImageTiling) void {
+pub fn createImage(self: *Self, allocator: *JrAllocator, tiling: c.VkImageTiling) void {
     const create_info = c.VkImageCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = null,
@@ -47,7 +48,7 @@ pub fn createImage(self: *Self, tiling: c.VkImageTiling) void {
         .initialLayout = c.VK_IMAGE_LAYOUT_UNDEFINED,
     };
 
-    if (c.vmaCreateImage(self.vulkan_ctx.vma_allocator.*, &create_info, &self.vma_allocation_create_info, &self.image, &self.vma_allocation, null) !=
+    if (c.vmaCreateImage(allocator.getVmaAllocator(), &create_info, &self.vma_allocation_create_info, &self.image, &self.vma_allocation, null) !=
         c.VK_SUCCESS)
     {
         @panic("Failed to create image!");
@@ -84,7 +85,7 @@ pub fn createImageView(self: *Self) void {
     }
 }
 
-pub fn transition_image_layout(self: *Self, command_buffer: c.VkCommandBuffer, new_layout: c.VkImageLayout) void {
+pub fn transitionImageLayout(self: *Self, command_buffer: c.VkCommandBuffer, new_layout: c.VkImageLayout) void {
     const old_layout = self.image_layout;
     var barrier = c.VkImageMemoryBarrier{
         .sType = c.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -141,23 +142,22 @@ pub fn transition_image_layout(self: *Self, command_buffer: c.VkCommandBuffer, n
 
         sourceStage = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = c.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    } else if (old_layout == c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL and // VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_UNDEFINED
-        new_layout == c.VK_IMAGE_LAYOUT_UNDEFINED)
+    } else if (old_layout == c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR and // VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        new_layout == c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+    {
+        barrier.srcAccessMask = c.VK_ACCESS_MEMORY_READ_BIT;
+        barrier.dstAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        sourceStage = c.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        destinationStage = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    } else if (old_layout == c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL and // VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        new_layout == c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
     {
         barrier.srcAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        barrier.dstAccessMask = 0;
+        barrier.dstAccessMask = c.VK_ACCESS_MEMORY_READ_BIT;
 
         sourceStage = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        destinationStage = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    } else if (old_layout == c.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL and // VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_UNDEFINED
-        new_layout == c.VK_IMAGE_LAYOUT_UNDEFINED)
-    {
-        barrier.srcAccessMask = c.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-            c.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        barrier.dstAccessMask = 0;
-
-        sourceStage = c.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        destinationStage = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = c.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     } else {
         @panic("Unsupported layout transition!");
     }
@@ -167,7 +167,36 @@ pub fn transition_image_layout(self: *Self, command_buffer: c.VkCommandBuffer, n
     self.image_layout = new_layout;
 }
 
-pub fn copy_to_image(self: *Self, command_buffer: c.VkCommandBuffer, destination: *Self) void {
+pub fn transitionImageLayoutWithQueueSubmit(self: *Self, command_buffer: c.VkCommandBuffer, new_layout: c.VkImageLayout, p_wait_semaphores_slice: *[]c.VkSemaphore, p_wait_stages: *c.VkPipelineStageFlags, p_signal_semaphores_slice: *[]c.VkSemaphore, fence: c.VkFence) void {
+    var begin_info = c.VkCommandBufferBeginInfo{
+        .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = 0,
+    };
+    _ = c.vkBeginCommandBuffer.?(command_buffer, &begin_info);
+
+    self.transitionImageLayout(command_buffer, new_layout);
+
+    _ = c.vkEndCommandBuffer.?(command_buffer);
+
+    var submit_info = c.VkSubmitInfo{
+        .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .waitSemaphoreCount = @intCast(p_wait_semaphores_slice.len),
+        .pWaitSemaphores = p_wait_semaphores_slice.ptr,
+        .pWaitDstStageMask = p_wait_stages,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &command_buffer,
+        .signalSemaphoreCount = @intCast(p_signal_semaphores_slice.len),
+        .pSignalSemaphores = p_signal_semaphores_slice.ptr,
+    };
+
+    if (c.vkQueueSubmit.?(self.vulkan_ctx.graphics_queue.*, 1, &submit_info, fence) !=
+        c.VK_SUCCESS)
+    {
+        @panic("Failed to transition image layout!");
+    }
+}
+
+pub fn copyToImage(self: *Self, command_buffer: c.VkCommandBuffer, destination: *Self) void {
     const blit_region = c.VkImageBlit2{
         .sType = c.VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
         .srcSubresource = c.VkImageSubresourceLayers{
@@ -206,8 +235,8 @@ pub fn copy_to_image(self: *Self, command_buffer: c.VkCommandBuffer, destination
     c.vkCmdBlitImage2.?(command_buffer, &blit_info);
 }
 
-pub fn destroy(self: *Self) void {
+pub fn deinit(self: *Self, allocator: *JrAllocator) void {
     c.vkDestroyImageView.?(self.vulkan_ctx.device.*, self.image_view, null);
-    c.vmaDestroyImage(self.vulkan_ctx.vma_allocator.*, self.image, self.vma_allocation);
+    c.vmaDestroyImage(allocator.getVmaAllocator(), self.image, self.vma_allocation);
     //c.vkDestroyImage.?(self.vulkan_ctx.device.*, self.image, null);
 }

@@ -8,7 +8,7 @@ const Self = @This();
 
 instance: *c.VkInstance,
 
-physicalDevice: *c.VkPhysicalDevice,
+physical_device: *c.VkPhysicalDevice,
 device: *c.VkDevice,
 
 queueFamilyIndices: *JrQueueFamilyIndices,
@@ -22,4 +22,6 @@ swapchain_images: *[3]*JrImage,
 swapchain_format: *c.VkFormat,
 swapchain_extent: *c.VkExtent2D,
 
-vma_allocator: *c.VmaAllocator,
+graphics_command_pool: *c.VkCommandPool,
+transfer_command_pool: *c.VkCommandPool,
+compute_command_pool: *c.VkCommandPool,

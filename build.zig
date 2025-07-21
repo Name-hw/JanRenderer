@@ -162,6 +162,36 @@ fn addPkg_C(b: *std.Build, pkg_name: []const u8, target: std.Build.ResolvedTarge
 //    }
 //}
 
+fn addShaderCommands(b: *std.Build) !*std.Build.Step.Run {
+    // current working directory
+    const cwd = fs.cwd();
+
+    const asset_shaders_path = b.path("assets/shaders/");
+    var asset_shaders_dir = try cwd.openDir(asset_shaders_path.getPath(b), .{ .iterate = true });
+    defer asset_shaders_dir.close();
+
+    var dir_iterator = asset_shaders_dir.iterate();
+
+    var shader_commandArrayList = std.ArrayList([]const u8).init(b.allocator);
+    defer shader_commandArrayList.deinit();
+
+    while (try dir_iterator.next()) |entry| {
+        if (entry.kind == .file and !mem.endsWith(u8, entry.name, ".spv")) {
+            const shader_name = try b.allocator.dupe(u8, entry.name);
+            const shader_command = try std.fmt.allocPrint(b.allocator, "glslc {s} -o {s}.spv", .{ shader_name, shader_name });
+
+            try shader_commandArrayList.append(shader_command);
+        }
+    }
+
+    const shader_commands: [][]const u8 = try shader_commandArrayList.toOwnedSlice();
+
+    const shader_cmd = b.addSystemCommand(shader_commands);
+    shader_cmd.setCwd(asset_shaders_path);
+
+    return shader_cmd;
+}
+
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
@@ -202,6 +232,15 @@ pub fn build(b: *std.Build) !void {
     //    b.addInstallArtifact(zglfw_lib, .{}),
     //    b.addInstallArtifact(zgui_lib, .{}),
     //};
+
+    // shader step
+    const shader_step = b.step("shader", "Run the shader build step");
+    const shader_cmd = addShaderCommands(b) catch |err| {
+        std.debug.print("Failed to add shader commands: {}\n", .{err});
+        return err;
+    };
+
+    shader_step.dependOn(&shader_cmd.step);
 
     // JanRenderer.lib step
     const lib_step = b.step("lib", "Run the library build step");
@@ -304,6 +343,7 @@ pub fn build(b: *std.Build) !void {
     exe_step.dependOn(&JrObjects_lib_installArtifact.step);
     exe_step.dependOn(&exe_installArtifact.step);
 
+    //b.getInstallStep().dependOn(shader_step);
     b.getInstallStep().dependOn(lib_step);
     b.getInstallStep().dependOn(exe_step);
 
@@ -317,6 +357,7 @@ pub fn build(b: *std.Build) !void {
     // directory. This is not necessary, however, if the application depends on
     // other installed files, this ensures they will be present and in the
     // expected location.
+    //run_cmd.step.dependOn(shader_step);
     run_cmd.step.dependOn(lib_step);
     run_cmd.step.dependOn(exe_step);
 

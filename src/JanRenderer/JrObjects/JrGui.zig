@@ -5,7 +5,6 @@ const zgui = @import("zgui");
 const common = @import("common.zig");
 const c = common.c;
 const JrVulkanContext = @import("JrVulkanContext.zig");
-const allocator = std.heap.c_allocator;
 
 const GuiError = error{
     FailedToCreateDescriptorPool,
@@ -21,7 +20,7 @@ pub const FontSet = struct {
     medium: zgui.Font,
     bold: zgui.Font,
 
-    pub fn init(self: *FontSet) !void {
+    pub fn init(self: *FontSet, allocator: std.mem.Allocator) !void {
         self.light = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Light.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
         self.regular = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Regular.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
         self.medium = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Medium.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
@@ -43,21 +42,21 @@ pub const JrGuiViewModel = extern struct {
 const Self = @This();
 
 vulkan_ctx: *JrVulkanContext,
-swapChainFramebuffers: [3]c.VkFramebuffer,
-renderPass: c.VkRenderPass,
+swapchain_framebuffers: [3]c.VkFramebuffer,
+render_pass: c.VkRenderPass,
 //pipeline: c.VkPipeline,
 //pipelineLayout: c.VkPipelineLayout,
-commandPool: c.VkCommandPool,
-commandBuffers: [3]c.VkCommandBuffer,
-renderFinishedSemaphores: [3]c.VkSemaphore,
-descriptorPool: c.VkDescriptorPool,
+command_pool: c.VkCommandPool,
+command_buffers: [3]c.VkCommandBuffer,
+render_finished_semaphores: [3]c.VkSemaphore,
+descriptor_pool: c.VkDescriptorPool,
 window: *zglfw.Window,
-initInfo: zgui.backend.ImGui_ImplVulkan_InitInfo,
-fontSet: *FontSet,
+init_info: zgui.backend.ImGui_ImplVulkan_InitInfo,
+font_set: *FontSet,
 style: *zgui.Style,
 viewModel: *JrGuiViewModel,
-msaaSamples: c.VkSampleCountFlagBits,
-currentFrame: u32,
+msaa_samples: c.VkSampleCountFlagBits,
+current_frame: u32,
 
 // Will use this in other code
 //pub const MessageType = enum { Print, Warning, Error };
@@ -72,56 +71,136 @@ currentFrame: u32,
 //    }
 //}
 
-pub fn init(self: *Self) void {
+pub fn init(self: *Self, allocator: std.mem.Allocator) void {
     createGuiRenderPass(self);
     createFramebuffers(self);
     createDescriptorPool(self);
     createCommandPool(self);
-    allocateCommandBuffer(self, c.VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+    createCommandBuffers(self, c.VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     createSyncObjects(self);
 
-    self.initInfo = zgui.backend.ImGui_ImplVulkan_InitInfo{
+    self.init_info = zgui.backend.ImGui_ImplVulkan_InitInfo{
         .instance = self.vulkan_ctx.instance.*,
-        .physical_device = self.vulkan_ctx.physicalDevice.*,
+        .physical_device = self.vulkan_ctx.physical_device.*,
         .device = self.vulkan_ctx.device.*,
         .queue_family = self.vulkan_ctx.queueFamilyIndices.graphics_family.?,
         .queue = self.vulkan_ctx.graphics_queue.*,
 
-        .descriptor_pool = self.descriptorPool,
-        .render_pass = self.renderPass,
+        .descriptor_pool = self.descriptor_pool,
+        .render_pass = self.render_pass,
         .min_image_count = 3,
         .image_count = 3,
-        .msaa_samples = self.msaaSamples,
+        .msaa_samples = self.msaa_samples,
+        .use_dynamic_rendering = false,
         .check_vk_result_fn = checkVkResult,
         .min_allocation_size = 1024 * 1024,
     };
 
     zgui.init(allocator);
 
-    var fontSet = FontSet{
+    var font_set = allocator.create(FontSet) catch {
+        @panic("Failed to create font set!");
+    };
+    font_set.* = FontSet{
         .name = "Pretendard",
         .light = undefined,
         .regular = undefined,
         .medium = undefined,
         .bold = undefined,
     };
-    fontSet.init() catch @panic("Failed to initialize font set!");
+    font_set.init(allocator) catch @panic("Failed to initialize font set!");
 
-    self.fontSet = &fontSet;
+    self.font_set = font_set;
     self.style = zgui.getStyle();
 
-    zgui.backend.init(self.initInfo, self.window);
+    zgui.backend.init(self.init_info, self.window);
 
     const configFlags = zgui.ConfigFlags{
         .dock_enable = true,
         .viewport_enable = true,
     };
     zgui.io.setConfigFlags(configFlags);
-    zgui.io.setDefaultFont(self.fontSet.regular);
+    zgui.io.setDefaultFont(self.font_set.regular);
 }
 
 pub fn checkVkResult(err: u32) callconv(.C) void {
     if (err != c.VK_SUCCESS) @panic("Imgui error!");
+}
+
+pub fn createGuiRenderPass(self: *Self) void {
+    const color_attachment = c.VkAttachmentDescription{
+        .format = self.vulkan_ctx.swapchain_format.*,
+        .samples = self.msaa_samples,
+        .loadOp = c.VK_ATTACHMENT_LOAD_OP_LOAD,
+        .storeOp = c.VK_ATTACHMENT_STORE_OP_STORE,
+        .stencilLoadOp = c.VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .stencilStoreOp = c.VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        .initialLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .finalLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .flags = 0,
+    };
+
+    const color_attachment_ref = c.VkAttachmentReference{
+        .attachment = 0,
+        .layout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    };
+
+    const subpass = c.VkSubpassDescription{
+        .pipelineBindPoint = c.VK_PIPELINE_BIND_POINT_GRAPHICS,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &color_attachment_ref,
+        .inputAttachmentCount = 0,
+        .pInputAttachments = null,
+        .pResolveAttachments = null,
+        .pDepthStencilAttachment = null,
+        .preserveAttachmentCount = 0,
+        .pPreserveAttachments = null,
+        .flags = 0,
+    };
+
+    const dependency = c.VkSubpassDependency{
+        .srcSubpass = c.VK_SUBPASS_EXTERNAL,
+        .dstSubpass = 0,
+        .srcStageMask = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .dstStageMask = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .srcAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dependencyFlags = 0,
+    };
+
+    const renderPassInfo = c.VkRenderPassCreateInfo{
+        .sType = c.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+        .pNext = null,
+        .flags = 0,
+        .attachmentCount = 1,
+        .pAttachments = &color_attachment,
+        .subpassCount = 1,
+        .pSubpasses = &subpass,
+        .dependencyCount = 1,
+        .pDependencies = &dependency,
+    };
+
+    if (c.vkCreateRenderPass.?(self.vulkan_ctx.device.*, &renderPassInfo, null, &self.render_pass) != c.VK_SUCCESS) {
+        @panic("Failed to create gui render pass!");
+    }
+}
+
+pub fn createFramebuffers(self: *Self) void {
+    for (self.vulkan_ctx.swapchain_images.*, 0..) |swapchainImage, i| {
+        const framebufferInfo = c.VkFramebufferCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+            .renderPass = self.render_pass,
+            .attachmentCount = 1,
+            .pAttachments = &swapchainImage.image_view,
+            .width = self.vulkan_ctx.swapchain_extent.*.width,
+            .height = self.vulkan_ctx.swapchain_extent.*.height,
+            .layers = 1,
+        };
+
+        if (c.vkCreateFramebuffer.?(self.vulkan_ctx.device.*, &framebufferInfo, null, &self.swapchain_framebuffers[i]) != c.VK_SUCCESS) {
+            @panic("Failed to create framebuffer!");
+        }
+    }
 }
 
 pub fn createDescriptorPool(self: *Self) void {
@@ -146,84 +225,8 @@ pub fn createDescriptorPool(self: *Self) void {
         .pPoolSizes = &poolSizes,
     };
 
-    if (c.vkCreateDescriptorPool.?(self.vulkan_ctx.device.*, &poolInfo, null, &self.descriptorPool) != c.VK_SUCCESS) {
+    if (c.vkCreateDescriptorPool.?(self.vulkan_ctx.device.*, &poolInfo, null, &self.descriptor_pool) != c.VK_SUCCESS) {
         @panic("Failed to create descriptor pool!");
-    }
-}
-
-pub fn createGuiRenderPass(self: *Self) void {
-    const colorAttachment = c.VkAttachmentDescription{
-        .format = self.vulkan_ctx.swapchain_format.*,
-        .samples = self.msaaSamples,
-        .loadOp = c.VK_ATTACHMENT_LOAD_OP_LOAD,
-        .storeOp = c.VK_ATTACHMENT_STORE_OP_STORE,
-        .stencilLoadOp = c.VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        .stencilStoreOp = c.VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        .initialLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .finalLayout = c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        .flags = 0,
-    };
-
-    const colorAttachmentRef = c.VkAttachmentReference{
-        .attachment = 0,
-        .layout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    };
-
-    const subpass = c.VkSubpassDescription{
-        .pipelineBindPoint = c.VK_PIPELINE_BIND_POINT_GRAPHICS,
-        .colorAttachmentCount = 1,
-        .pColorAttachments = &colorAttachmentRef,
-        .inputAttachmentCount = 0,
-        .pInputAttachments = null,
-        .pResolveAttachments = null,
-        .pDepthStencilAttachment = null,
-        .preserveAttachmentCount = 0,
-        .pPreserveAttachments = null,
-        .flags = 0,
-    };
-
-    const dependency = c.VkSubpassDependency{
-        .srcSubpass = c.VK_SUBPASS_EXTERNAL,
-        .dstSubpass = 0,
-        .srcStageMask = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        .dstStageMask = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        .srcAccessMask = 0,
-        .dstAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .dependencyFlags = 0,
-    };
-
-    const renderPassInfo = c.VkRenderPassCreateInfo{
-        .sType = c.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .pNext = null,
-        .flags = 0,
-        .attachmentCount = 1,
-        .pAttachments = &colorAttachment,
-        .subpassCount = 1,
-        .pSubpasses = &subpass,
-        .dependencyCount = 1,
-        .pDependencies = &dependency,
-    };
-
-    if (c.vkCreateRenderPass.?(self.vulkan_ctx.device.*, &renderPassInfo, null, &self.renderPass) != c.VK_SUCCESS) {
-        @panic("Failed to create gui render pass!");
-    }
-}
-
-pub fn createFramebuffers(self: *Self) void {
-    for (self.vulkan_ctx.swapchain_images.*, 0..) |swapchainImage, i| {
-        const framebufferInfo = c.VkFramebufferCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .renderPass = self.renderPass,
-            .attachmentCount = 1,
-            .pAttachments = &swapchainImage.image_view,
-            .width = self.vulkan_ctx.swapchain_extent.*.width,
-            .height = self.vulkan_ctx.swapchain_extent.*.height,
-            .layers = 1,
-        };
-
-        if (c.vkCreateFramebuffer.?(self.vulkan_ctx.device.*, &framebufferInfo, null, &self.swapChainFramebuffers[i]) != c.VK_SUCCESS) {
-            @panic("Failed to create framebuffer!");
-        }
     }
 }
 
@@ -235,21 +238,21 @@ pub fn createCommandPool(self: *Self) void {
         .queueFamilyIndex = self.vulkan_ctx.queueFamilyIndices.graphics_family.?,
     };
 
-    if (c.vkCreateCommandPool.?(self.vulkan_ctx.device.*, &poolInfo, null, &self.commandPool) != c.VK_SUCCESS) {
+    if (c.vkCreateCommandPool.?(self.vulkan_ctx.device.*, &poolInfo, null, &self.command_pool) != c.VK_SUCCESS) {
         @panic("Failed to create command pool!");
     }
 }
 
-pub fn allocateCommandBuffer(self: *Self, level: c.VkCommandBufferLevel) void {
+pub fn createCommandBuffers(self: *Self, level: c.VkCommandBufferLevel) void {
     var allocInfo = c.VkCommandBufferAllocateInfo{
         .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .pNext = null,
-        .commandPool = self.commandPool,
+        .commandPool = self.command_pool,
         .level = level,
         .commandBufferCount = 3,
     };
 
-    if (c.vkAllocateCommandBuffers.?(self.vulkan_ctx.device.*, &allocInfo, &self.commandBuffers) != c.VK_SUCCESS) {
+    if (c.vkAllocateCommandBuffers.?(self.vulkan_ctx.device.*, &allocInfo, &self.command_buffers) != c.VK_SUCCESS) {
         @panic("Failed to allocate command buffer!");
     }
 }
@@ -260,14 +263,14 @@ pub fn createSyncObjects(self: *Self) void {
     };
 
     for (0..3) |i| {
-        if (c.vkCreateSemaphore.?(self.vulkan_ctx.device.*, &semaphoreInfo, null, &self.renderFinishedSemaphores[i]) != c.VK_SUCCESS) {
+        if (c.vkCreateSemaphore.?(self.vulkan_ctx.device.*, &semaphoreInfo, null, &self.render_finished_semaphores[i]) != c.VK_SUCCESS) {
             @panic("Failed to create synchronization objects for a frame!");
         }
     }
 }
 
-pub fn newFrame(self: *Self, width: u32, height: u32, currentFrame: u32) void {
-    self.currentFrame = currentFrame;
+pub fn newFrame(self: *Self, width: u32, height: u32, current_frame: u32) void {
+    self.current_frame = current_frame;
     zgui.backend.newFrame(width, height);
 
     if (zgui.begin("window", .{})) {
@@ -314,7 +317,7 @@ pub fn recreateSwapchain(self: *Self) void {
 }
 
 pub fn render(self: *Self, imageIndex: u32, waitSemaphoreCount: u32, pWaitSemaphores: *c.VkSemaphore, fence: c.VkFence) void {
-    _ = c.vkResetCommandBuffer.?(self.commandBuffers[self.currentFrame], 0);
+    _ = c.vkResetCommandBuffer.?(self.command_buffers[self.current_frame], 0);
 
     recordCommandBuffer(self, imageIndex);
 
@@ -328,28 +331,26 @@ pub fn render(self: *Self, imageIndex: u32, waitSemaphoreCount: u32, pWaitSemaph
         .pWaitSemaphores = pWaitSemaphores,
         .pWaitDstStageMask = &waitStages,
         .commandBufferCount = 1,
-        .pCommandBuffers = &self.commandBuffers[self.currentFrame],
+        .pCommandBuffers = &self.command_buffers[self.current_frame],
         .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &self.renderFinishedSemaphores[self.currentFrame],
+        .pSignalSemaphores = &self.render_finished_semaphores[self.current_frame],
     };
 
     if (c.vkQueueSubmit.?(self.vulkan_ctx.graphics_queue.*, 1, &submitInfo, fence) != c.VK_SUCCESS) {
         @panic("Failed to submit gui command buffer!");
     }
 
-    _ = c.vkQueueWaitIdle.?(self.vulkan_ctx.graphics_queue.*);
-
     zgui.updatePlatformWindows();
     zgui.renderPlatformWindowsDefault();
 }
 
-pub fn recordCommandBuffer(self: *Self, imageIndex: u32) void {
+pub fn recordCommandBuffer(self: *Self, image_index: u32) void {
     var beginInfo = c.VkCommandBufferBeginInfo{
         .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = 0,
         .pInheritanceInfo = null,
     };
-    if (c.vkBeginCommandBuffer.?(self.commandBuffers[self.currentFrame], &beginInfo) != c.VK_SUCCESS) {
+    if (c.vkBeginCommandBuffer.?(self.command_buffers[self.current_frame], &beginInfo) != c.VK_SUCCESS) {
         @panic("Failed to begin recording gui command buffer!");
     }
 
@@ -357,45 +358,46 @@ pub fn recordCommandBuffer(self: *Self, imageIndex: u32) void {
         .{ .color = .{ .uint32 = [4]u32{ 0, 0, 0, 0 } } },
     };
 
-    const renderPassInfo = c.VkRenderPassBeginInfo{
+    const render_pass_info = c.VkRenderPassBeginInfo{
         .sType = c.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = self.renderPass,
-        .framebuffer = self.swapChainFramebuffers[imageIndex],
-        .renderArea = .{
-            .offset = .{ .x = 0, .y = 0 },
+        .renderPass = self.render_pass,
+        .framebuffer = self.swapchain_framebuffers[image_index],
+        .renderArea = c.VkRect2D{
+            .offset = c.VkOffset2D{ .x = 0, .y = 0 },
             .extent = self.vulkan_ctx.swapchain_extent.*,
         },
         .clearValueCount = 1,
         .pClearValues = &clearValues,
     };
-    _ = c.vkCmdBeginRenderPass.?(self.commandBuffers[self.currentFrame], &renderPassInfo, c.VK_SUBPASS_CONTENTS_INLINE);
+    _ = c.vkCmdBeginRenderPass.?(self.command_buffers[self.current_frame], &render_pass_info, c.VK_SUBPASS_CONTENTS_INLINE);
 
-    zgui.backend.render(self.commandBuffers[self.currentFrame]);
+    zgui.backend.render(self.command_buffers[self.current_frame]);
 
-    _ = c.vkCmdEndRenderPass.?(self.commandBuffers[self.currentFrame]);
-    if (c.vkEndCommandBuffer.?(self.commandBuffers[self.currentFrame]) != c.VK_SUCCESS) {
+    _ = c.vkCmdEndRenderPass.?(self.command_buffers[self.current_frame]);
+
+    if (c.vkEndCommandBuffer.?(self.command_buffers[self.current_frame]) != c.VK_SUCCESS) {
         @panic("Failed to record gui command buffer!");
     }
 }
 
-pub fn destroy(self: *Self) void {
+pub fn deinit(self: *Self) void {
     zgui.backend.deinit();
     zgui.deinit();
 
     destroyFramebuffers(self);
 
-    c.vkDestroyRenderPass.?(self.vulkan_ctx.device.*, self.renderPass, null);
+    c.vkDestroyRenderPass.?(self.vulkan_ctx.device.*, self.render_pass, null);
 
-    c.vkDestroyDescriptorPool.?(self.vulkan_ctx.device.*, self.descriptorPool, null);
-    c.vkDestroyCommandPool.?(self.vulkan_ctx.device.*, self.commandPool, null);
+    c.vkDestroyDescriptorPool.?(self.vulkan_ctx.device.*, self.descriptor_pool, null);
+    c.vkDestroyCommandPool.?(self.vulkan_ctx.device.*, self.command_pool, null);
 
-    for (self.renderFinishedSemaphores) |renderFinishedSemaphore| {
+    for (self.render_finished_semaphores) |renderFinishedSemaphore| {
         c.vkDestroySemaphore.?(self.vulkan_ctx.device.*, renderFinishedSemaphore, null);
     }
 }
 
 pub fn destroyFramebuffers(self: *Self) void {
-    for (self.swapChainFramebuffers) |framebuffer| {
+    for (self.swapchain_framebuffers) |framebuffer| {
         c.vkDestroyFramebuffer.?(self.vulkan_ctx.device.*, framebuffer, null);
     }
 }

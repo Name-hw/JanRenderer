@@ -85,29 +85,38 @@ struct UniformBufferObject {
 };
 
 struct Particle {
-  vec2s position;
-  vec2s velocity;
+  vec4s position;
+  vec3s velocity;
   vec4s color;
 
-  static VkVertexInputBindingDescription getBindingDescription() {
-    VkVertexInputBindingDescription bindingDescription{};
-    bindingDescription.binding = 0;
+  static VkVertexInputBindingDescription2EXT getBindingDescription() {
+    VkVertexInputBindingDescription2EXT bindingDescription{};
+    bindingDescription.sType =
+        VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT;
+    bindingDescription.binding = 1;
     bindingDescription.stride = sizeof(Particle);
     bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    bindingDescription.divisor = 0;
 
     return bindingDescription;
   }
-  static std::array<VkVertexInputAttributeDescription, 2>
-  getAttributeDescriptions() {
-    std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
 
-    attributeDescriptions[0].binding = 0;
-    attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+  static std::array<VkVertexInputAttributeDescription2EXT, 2>
+  getAttributeDescriptions() {
+    std::array<VkVertexInputAttributeDescription2EXT, 2>
+        attributeDescriptions{};
+
+    attributeDescriptions[0].sType =
+        VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT;
+    attributeDescriptions[0].location = 10;
+    attributeDescriptions[0].binding = 1;
+    attributeDescriptions[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
     attributeDescriptions[0].offset = offsetof(Particle, position);
 
-    attributeDescriptions[1].binding = 0;
-    attributeDescriptions[1].location = 1;
+    attributeDescriptions[1].sType =
+        VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT;
+    attributeDescriptions[1].location = 11;
+    attributeDescriptions[1].binding = 1;
     attributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
     attributeDescriptions[1].offset = offsetof(Particle, color);
 
@@ -181,18 +190,20 @@ private:
   VkPipelineLayout computePipelineLayout;
   VkPipeline computePipeline;
 
-  VkCommandPool commandPool;
+  VkCommandPool graphicsCommandPool;
   VkCommandPool transferCommandPool;
   VkCommandPool computeCommandPool;
-  std::vector<VkCommandBuffer> commandBuffers;
   std::vector<VkCommandBuffer> computeCommandBuffers;
+  std::vector<VkCommandBuffer> commandBuffers;
+  std::vector<VkCommandBuffer> transitionCommandBuffers;
   VkCommandBuffer guiCommandBuffer;
   // secondary command buffers
   // ...
 
   std::vector<VkSemaphore> imageAvailableSemaphores;
-  std::vector<VkSemaphore> renderFinishedSemaphores;
   std::vector<VkSemaphore> computeFinishedSemaphores;
+  std::vector<VkSemaphore> renderFinishedSemaphores;
+  std::vector<VkSemaphore> presentReadySemaphores;
   std::vector<VkFence> inFlightFences;
   std::vector<VkFence> computeInFlightFences;
   uint32_t currentFrame = 0;
@@ -231,13 +242,15 @@ private:
   std::vector<VkBuffer> shaderStorageBuffers;
   std::vector<VkDeviceMemory> shaderStorageBuffersMemory;
 
-  VmaAllocator vmaAllocator;
-
   // JrObjects
   // HMODULE JrClasses_lib; dynamic loading of JrClasses library (old way)
+  std::unique_ptr<JrAllocator> allocator;
   JrVulkanContext vulkanCtx;
   JrCamera *camera;
   JrGui *gui;
+
+  std::unique_ptr<JrShader> particleVertShader;
+  std::unique_ptr<JrShader> particleFragShader;
 
   float deltaTime = 0.0f;       // Time between current frame and last frame
   float timeOfLastFrame = 0.0f; // Time of last frame
@@ -313,8 +326,8 @@ private:
   bool isDeviceSuitable(VkPhysicalDevice physicalDevice_);
   bool checkDeviceExtensionSupport(VkPhysicalDevice physicalDevice_);
   void createLogicalDevice();
-  void createVmaAllocator();
   void createVulkanContextBeforeCreateSwapChain();
+  void createAllocators();
   void createSwapChain();
   SwapChainSupportDetails
   querySwapChainSupport(VkPhysicalDevice physicalDevice_);
@@ -327,6 +340,7 @@ private:
   void createComputeDescriptorSetLayout();
   void createGraphicsPipeline();
   void createComputePipeline();
+  void createShaderObjects();
   void createCommandPools();
   void createVulkanContext();
   void createColorResources();
@@ -352,6 +366,8 @@ private:
   void createComputeDescriptorPool();
   void createComputeDescriptorSets();
   void createComputeCommandBuffers();
+
+  void createTransitionCommandBuffers();
 
   void createSyncObjects();
 

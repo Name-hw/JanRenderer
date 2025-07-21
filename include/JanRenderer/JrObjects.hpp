@@ -10,6 +10,14 @@ template <typename T> struct ZigSlice {
 extern "C" {
 struct JrVulkanContext;
 
+struct JrAllocator {
+  JrVulkanContext *vulkanCtx;
+  VmaAllocator *vmaAllocator;
+  void *debugAllocator;
+};
+void jrAllocator_init(JrAllocator *);
+void jrAllocator_deinit(JrAllocator *);
+
 struct JrQueueFamilyIndices {
   uint32_t graphicsFamily;
   uint32_t presentFamily;
@@ -32,13 +40,18 @@ struct JrImage {
   VkImageUsageFlags imageUsage;
   VkImageAspectFlags imageAspectMask;
 };
-void jrImage_init(JrImage *, VkImageTiling tiling);
+void jrImage_init(JrImage *, JrAllocator *, VkImageTiling tiling);
 void jrImage_initFromSwapchain(JrImage *);
 void jrImage_transitionImageLayout(JrImage *, VkCommandBuffer commandBuffer,
                                    VkImageLayout newLayout);
+void jrImage_transitionImageLayoutWithQueueSubmit(
+    JrImage *, VkCommandBuffer commandBuffer, VkImageLayout newLayout,
+    ZigSlice<VkSemaphore> *pWaitSemaphoresSlice,
+    VkPipelineStageFlags *pWaitStages,
+    ZigSlice<VkSemaphore> *pSignalSemaphoresSlice, VkFence fence);
 void jrImage_copyToImage(JrImage *, VkCommandBuffer commandBuffer,
                          JrImage *destination);
-void jrImage_destroy(JrImage *);
+void jrImage_deinit(JrImage *, JrAllocator *allocator);
 
 struct JrVulkanContext {
   VkInstance *instance;
@@ -57,7 +70,9 @@ struct JrVulkanContext {
   VkFormat *swapchainFormat;
   VkExtent2D *swapchainExtent;
 
-  VmaAllocator *vmaAllocator;
+  VkCommandPool *graphicsCommandPool;
+  VkCommandPool *transferCommandPool;
+  VkCommandPool *computeCommandPool;
 };
 
 struct JrCamera {
@@ -128,12 +143,12 @@ struct JrGui {
   VkSampleCountFlagBits msaaSamples;
   uint32_t currentFrame;
 };
-void jrGui_init(JrGui *);
+void jrGui_init(JrGui *, JrAllocator *);
 void jrGui_newFrame(JrGui *, uint32_t width, uint32_t height,
                     uint32_t currentFrame);
 // void jrGui_setupDockSpace(JrGui *);
 void jrGui_recreateSwapchain(JrGui *);
 void jrGui_render(JrGui *, uint32_t imageIndex, uint32_t waitSemaphoreCount,
                   VkSemaphore *pWaitSemaphores, VkFence fence);
-void jrGui_destroy(JrGui *);
+void jrGui_deinit(JrGui *);
 }

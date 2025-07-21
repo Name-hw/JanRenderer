@@ -12,7 +12,7 @@ Rendering engine built with Vulkan written in C++17 and Zig.
 - Generate Mipmaps
 - MSAA (MultiSampling Anti-Aliasing) support
 - Compute Shader
-- Flexible graphics pipeline with Vulkan dynamic rendering
+- Flexible graphics pipeline with Vulkan dynamic rendering and shader objects
 
 ## **Getting Started**
 
