@@ -2,6 +2,11 @@
 
 #include <JanRenderer/common.hpp>
 
+template <typename T> struct ZigSlice {
+  T *ptr;
+  size_t len;
+};
+
 extern "C" {
 struct JrVulkanContext;
 
@@ -84,15 +89,20 @@ void jrCamera_scrollCallback(GLFWwindow *window, double xoffset,
                              double yoffset);
 
 struct JrShader {
-  VkShaderStageFlagBits stage;
-  VkShaderStageFlags nextStage;
-  VkShaderEXT shaderEXT;
-  VkShaderCreateInfoEXT shaderEXT_createInfo;
-  char *shader_name;
-  uint32_t *spirv;
+  JrVulkanContext *vulkanCtx;
+  VkShaderEXT shader;
+  VkShaderCreateInfoEXT shaderCreateInfo;
+  ZigSlice<uint32_t> spirv;
+  VkShaderStageFlagBits shaderStage;
 };
-void createLinkedShaders(VkDevice device, JrShader *vertShader,
-                         JrShader *fragShader);
+void jrShader_init(JrShader *, VkShaderStageFlags nextStage,
+                   uint32_t descriptorSetLayoutCount,
+                   VkDescriptorSetLayout *pDescriptorSetLayouts,
+                   uint32_t pushConstantRangeCount,
+                   VkPushConstantRange *pPushConstantRanges);
+void jrShader_buildLinkedShaders(JrShader *vertShader, JrShader *fragShader);
+void jrShader_bindShader(JrShader *, VkCommandBuffer commandBuffer);
+void jrShader_destroy(JrShader *);
 
 struct JrGuiViewModel {
   vec3s *CameraPosition;
