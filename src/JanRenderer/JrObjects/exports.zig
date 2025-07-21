@@ -4,13 +4,31 @@ const common = @import("common.zig");
 const c = common.c;
 
 const JrQueueFamilyIndices = @import("JrQueueFamilyIndices.zig");
-const JrCamera = @import("JrCamera.zig");
-const JrGui = @import("JrGui.zig");
 const JrImage = @import("JrImage.zig");
+const JrCamera = @import("JrCamera.zig");
+const JrShader = @import("JrShader.zig");
+const JrGui = @import("JrGui.zig");
 
 // JrQueueFamilyIndices
 export fn jrQueueFamilyIndices_isComplete(self: *JrQueueFamilyIndices) callconv(.C) bool {
     return JrQueueFamilyIndices.isComplete(self);
+}
+
+// JrImage
+export fn jrImage_init(self: *JrImage, tiling: c.VkImageTiling) callconv(.C) void {
+    JrImage.init(self, tiling);
+}
+export fn jrImage_initFromSwapchain(self: *JrImage) callconv(.C) void {
+    JrImage.init_from_swapchain(self);
+}
+export fn jrImage_transitionImageLayout(self: *JrImage, commandBuffer: c.VkCommandBuffer, newLayout: c.VkImageLayout) callconv(.C) void {
+    JrImage.transition_image_layout(self, commandBuffer, newLayout);
+}
+export fn jrImage_copyToImage(self: *JrImage, commandBuffer: c.VkCommandBuffer, destination: *JrImage) callconv(.C) void {
+    JrImage.copy_to_image(self, commandBuffer, destination);
+}
+export fn jrImage_destroy(self: *JrImage) callconv(.C) void {
+    JrImage.destroy(self);
 }
 
 // JrCamera
@@ -42,6 +60,27 @@ export fn jrCamera_update(self: *JrCamera, deltaTime: f32) callconv(.C) void {
     JrCamera.update(self, deltaTime);
 }
 
+// JrShader
+export fn jrShader_init(
+    self: *JrShader,
+    nextStage: c.VkShaderStageFlags,
+    descriptorSetLayoutCount: u32,
+    pDescriptorSetLayouts: *c.VkDescriptorSetLayout,
+    pushConstantRangeCount: u32,
+    pPushConstantRanges: *c.VkPushConstantRange,
+) callconv(.C) void {
+    JrShader.init(self, nextStage, descriptorSetLayoutCount, pDescriptorSetLayouts, pushConstantRangeCount, pPushConstantRanges);
+}
+export fn jrShader_buildLinkedShaders(vertShader: *JrShader, fragShader: *JrShader) callconv(.C) void {
+    JrShader.buildLinkedShaders(vertShader, fragShader);
+}
+export fn jrShader_bindShader(self: *JrShader, commandBuffer: c.VkCommandBuffer) callconv(.C) void {
+    JrShader.bindShader(self, commandBuffer);
+}
+export fn jrShader_destroy(self: *JrShader) callconv(.C) void {
+    JrShader.destroy(self);
+}
+
 // JrGui
 export fn jrGui_init(self: *JrGui) callconv(.C) void {
     JrGui.init(self);
@@ -57,21 +96,4 @@ export fn jrGui_render(self: *JrGui, imageIndex: u32, waitSemaphoreCount: u32, p
 }
 export fn jrGui_destroy(self: *JrGui) callconv(.C) void {
     JrGui.destroy(self);
-}
-
-// JrImage
-export fn jrImage_init(self: *JrImage, tiling: c.VkImageTiling) callconv(.C) void {
-    JrImage.init(self, tiling);
-}
-export fn jrImage_initFromSwapchain(self: *JrImage) callconv(.C) void {
-    JrImage.init_from_swapchain(self);
-}
-export fn jrImage_transitionImageLayout(self: *JrImage, commandBuffer: c.VkCommandBuffer, newLayout: c.VkImageLayout) callconv(.C) void {
-    JrImage.transition_image_layout(self, commandBuffer, newLayout);
-}
-export fn jrImage_copyToImage(self: *JrImage, commandBuffer: c.VkCommandBuffer, destination: *JrImage) callconv(.C) void {
-    JrImage.copy_to_image(self, commandBuffer, destination);
-}
-export fn jrImage_destroy(self: *JrImage) callconv(.C) void {
-    JrImage.destroy(self);
 }
