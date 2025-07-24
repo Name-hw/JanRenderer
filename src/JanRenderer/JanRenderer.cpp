@@ -457,7 +457,6 @@ void JanRenderer::initVulkan() {
   createVmaAllocator();
   createVulkanContextBeforeCreateSwapChain();
   createSwapChain();
-  createRenderPass();
   createDescriptorSetLayout();
   createComputeDescriptorSetLayout();
   createGraphicsPipeline();
@@ -466,7 +465,6 @@ void JanRenderer::initVulkan() {
   createVulkanContext();
   createColorResources();
   createDepthResources();
-  createFramebuffers();
   createTextureImage();
   createTextureSampler();
   loadModel();
@@ -694,9 +692,15 @@ void JanRenderer::createLogicalDevice() {
   vulkan12Features.bufferDeviceAddress = VK_TRUE;
   vulkan12Features.descriptorIndexing = VK_TRUE;
 
+  VkPhysicalDeviceVulkan13Features vulkan13Features{};
+  vulkan13Features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+  vulkan13Features.pNext = &vulkan12Features;
+  vulkan13Features.dynamicRendering = VK_TRUE;
+
   VkPhysicalDeviceFeatures2 deviceFeatures2{};
   deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  deviceFeatures2.pNext = &vulkan12Features;
+  deviceFeatures2.pNext = &vulkan13Features;
   deviceFeatures2.features = deviceFeatures;
 
   VkDeviceCreateInfo createInfo{};
@@ -935,86 +939,6 @@ JanRenderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) {
   }
 }
 
-// initVulkan createRenderPass
-void JanRenderer::createRenderPass() {
-  VkAttachmentDescription colorAttachment{};
-  colorAttachment.format = swapChainImageFormat;
-  colorAttachment.samples = msaaSamples;
-  colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentReference colorAttachmentRef{};
-  colorAttachmentRef.attachment = 0;
-  colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentDescription depthAttachment{};
-  depthAttachment.format = findDepthFormat();
-  depthAttachment.samples = msaaSamples;
-  depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  depthAttachment.finalLayout =
-      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentReference depthAttachmentRef{};
-  depthAttachmentRef.attachment = 1;
-  depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentDescription colorAttachmentResolve{};
-  colorAttachmentResolve.format = swapChainImageFormat;
-  colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-  colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentReference colorAttachmentResolveRef{};
-  colorAttachmentResolveRef.attachment = 2;
-  colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkSubpassDescription subpass{};
-  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &colorAttachmentRef;
-  subpass.pDepthStencilAttachment = &depthAttachmentRef;
-  subpass.pResolveAttachments = &colorAttachmentResolveRef;
-
-  VkSubpassDependency dependency{};
-  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-  dependency.dstSubpass = 0;
-  dependency.srcAccessMask = 0;
-  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-  std::array<VkAttachmentDescription, 3> attachments = {
-      colorAttachment, depthAttachment, colorAttachmentResolve};
-  VkRenderPassCreateInfo renderPassInfo{};
-  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-  renderPassInfo.pAttachments = attachments.data();
-  renderPassInfo.subpassCount = 1;
-  renderPassInfo.pSubpasses = &subpass;
-  renderPassInfo.dependencyCount = 1;
-  renderPassInfo.pDependencies = &dependency;
-
-  if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("failed to create render pass!");
-  }
-}
-
 // initVulkan createDescriptorSetLayout
 void JanRenderer::createDescriptorSetLayout() {
   VkDescriptorSetLayoutBinding uboLayoutBinding{};
@@ -1221,8 +1145,17 @@ void JanRenderer::createGraphicsPipeline() {
   depthStencil.front = {}; // Optional
   depthStencil.back = {};  // Optional
 
+  // Provide information for dynamic rendering
+  VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
+  pipelineRenderingInfo.sType =
+      VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+  pipelineRenderingInfo.colorAttachmentCount = 1;
+  pipelineRenderingInfo.pColorAttachmentFormats = &swapChainImageFormat;
+  pipelineRenderingInfo.depthAttachmentFormat = findDepthFormat();
+
   VkGraphicsPipelineCreateInfo pipelineInfo{};
   pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  pipelineInfo.pNext = &pipelineRenderingInfo;
   // shaderStage
   pipelineInfo.stageCount = 2;
   pipelineInfo.pStages = shaderStages;
@@ -1238,7 +1171,7 @@ void JanRenderer::createGraphicsPipeline() {
   // Pipeline layout
   pipelineInfo.layout = pipelineLayout;
   // Render Pass
-  pipelineInfo.renderPass = renderPass;
+  pipelineInfo.renderPass = VK_NULL_HANDLE;
   pipelineInfo.subpass = 0;
   // Base-pipeline
   pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
@@ -1306,7 +1239,6 @@ void JanRenderer::createVulkanContext() {
       uniquePtrVectorToRawPtrArrayPtr<JrImage, 3>(swapChainImages);
   vulkanCtx.swapchainFormat = &swapChainImageFormat;
   vulkanCtx.swapchainExtent = &swapChainExtent;
-  vulkanCtx.renderPass = &renderPass;
 }
 
 // initVulkan createColorResources
@@ -1364,12 +1296,6 @@ void JanRenderer::createDepthResources() {
   depthImage->imageAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
   jrImage_init(depthImage.get(), VK_IMAGE_TILING_OPTIMAL);
-
-  VkCommandBuffer commandBuffer = beginSingleTimeCommands(commandPool);
-  jrImage_transitionImageLayout(
-      depthImage.get(), commandBuffer,
-      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-  endSingleTimeCommands(graphicsQueue, commandPool, commandBuffer);
 }
 
 // initVulkan createDepthResources findDepthFormat
@@ -1399,31 +1325,6 @@ JanRenderer::findSupportedFormat(const std::vector<VkFormat> &candidates,
   }
 
   throw std::runtime_error("failed to find supported format!");
-}
-
-// initVulkan createFramebuffers
-void JanRenderer::createFramebuffers() {
-  swapChainFramebuffers.resize(swapChainImages.size());
-
-  for (size_t i = 0; i < swapChainImages.size(); i++) {
-    std::array<VkImageView, 3> attachments = {colorImage->imageView,
-                                              depthImage->imageView,
-                                              swapChainImages[i]->imageView};
-
-    VkFramebufferCreateInfo framebufferInfo{};
-    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebufferInfo.renderPass = renderPass;
-    framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-    framebufferInfo.pAttachments = attachments.data();
-    framebufferInfo.width = swapChainExtent.width;
-    framebufferInfo.height = swapChainExtent.height;
-    framebufferInfo.layers = 1;
-
-    if (vkCreateFramebuffer(device, &framebufferInfo, nullptr,
-                            &swapChainFramebuffers[i]) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create framebuffer!");
-    }
-  }
 }
 
 // initVulkan createTextureImage
@@ -2202,20 +2103,47 @@ void JanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
     throw std::runtime_error("failed to begin recording command buffer!");
   }
 
-  std::array<VkClearValue, 2> clearValues{};
-  clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-  clearValues[1].depthStencil = {1.0f, 0};
-  VkRenderPassBeginInfo renderPassInfo{};
-  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  renderPassInfo.renderPass = renderPass;
-  renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
-  renderPassInfo.renderArea.offset = {0, 0};
-  renderPassInfo.renderArea.extent = swapChainExtent;
-  renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-  renderPassInfo.pClearValues = clearValues.data();
+  // Dynamic rendering
+  jrImage_transitionImageLayout(colorImage.get(), commandBuffer,
+                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  jrImage_transitionImageLayout(swapChainImages[imageIndex].get(),
+                                commandBuffer,
+                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  jrImage_transitionImageLayout(
+      depthImage.get(), commandBuffer,
+      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
-  vkCmdBeginRenderPass(commandBuffer, &renderPassInfo,
-                       VK_SUBPASS_CONTENTS_INLINE);
+  VkRenderingAttachmentInfo colorAttachmentInfo{};
+  colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+  colorAttachmentInfo.imageView = colorImage->imageView;
+  colorAttachmentInfo.imageLayout = colorImage->imageLayout;
+  colorAttachmentInfo.resolveMode = VK_RESOLVE_MODE_NONE;
+  colorAttachmentInfo.resolveImageView = swapChainImages[imageIndex]->imageView;
+  colorAttachmentInfo.resolveImageLayout =
+      swapChainImages[imageIndex]->imageLayout;
+  colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  colorAttachmentInfo.clearValue.color = {0.0f, 0.0f, 0.0f, 1.0f};
+
+  VkRenderingAttachmentInfo depthAttachmentInfo{};
+  depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+  depthAttachmentInfo.imageView = depthImage->imageView;
+  depthAttachmentInfo.imageLayout = depthImage->imageLayout;
+  depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  depthAttachmentInfo.clearValue.depthStencil = {1.0f, 0};
+
+  VkRenderingInfo renderingInfo{};
+  renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+  renderingInfo.renderArea.offset = {0, 0};
+  renderingInfo.renderArea.extent = swapChainExtent;
+  renderingInfo.layerCount = 1;
+  renderingInfo.colorAttachmentCount = 1;
+  renderingInfo.pColorAttachments = &colorAttachmentInfo;
+  renderingInfo.pDepthAttachment = &depthAttachmentInfo;
+
+  vkCmdBeginRendering(commandBuffer, &renderingInfo);
+
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     graphicsPipeline);
 
@@ -2255,7 +2183,14 @@ void JanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
   // jrImage_copyToImage(colorImage, swapChainImages[imageIndex],
   // commandBuffer);
 
-  vkCmdEndRenderPass(commandBuffer);
+  vkCmdEndRenderingKHR(commandBuffer);
+
+  jrImage_transitionImageLayout(colorImage.get(), commandBuffer,
+                                VK_IMAGE_LAYOUT_UNDEFINED);
+  jrImage_transitionImageLayout(swapChainImages[imageIndex].get(),
+                                commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED);
+  jrImage_transitionImageLayout(depthImage.get(), commandBuffer,
+                                VK_IMAGE_LAYOUT_UNDEFINED);
 
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
     throw std::runtime_error("failed to record command buffer!");
@@ -2331,7 +2266,6 @@ void JanRenderer::recreateSwapChain() {
   createSwapChain();
   createColorResources();
   createDepthResources();
-  createFramebuffers();
   createVulkanContext();
 }
 
@@ -2347,8 +2281,6 @@ void JanRenderer::cleanup() {
   vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
   vkDestroyPipeline(device, computePipeline, nullptr);
   vkDestroyPipelineLayout(device, computePipelineLayout, nullptr);
-
-  vkDestroyRenderPass(device, renderPass, nullptr);
 
   vkDestroySampler(device, textureSampler, nullptr);
   jrImage_destroy(textureImage.get());
@@ -2408,7 +2340,6 @@ void JanRenderer::cleanupSwapChain() {
   jrImage_destroy(depthImage.get());
 
   for (size_t i = 0; i < swapChainImages.size(); i++) {
-    vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
     vkDestroyImageView(device, swapChainImages[i]->imageView, nullptr);
   }
 

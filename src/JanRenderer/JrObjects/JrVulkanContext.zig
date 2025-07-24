@@ -22,6 +22,4 @@ swapchain_images: *[3]*JrImage,
 swapchain_format: *c.VkFormat,
 swapchain_extent: *c.VkExtent2D,
 
-renderPass: *c.VkRenderPass,
-
 vma_allocator: *c.VmaAllocator,

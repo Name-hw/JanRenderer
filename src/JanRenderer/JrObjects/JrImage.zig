@@ -133,6 +133,14 @@ pub fn transition_image_layout(self: *Self, command_buffer: c.VkCommandBuffer, n
 
         sourceStage = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = c.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    } else if (old_layout == c.VK_IMAGE_LAYOUT_UNDEFINED and
+        new_layout == c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+    {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+
+        sourceStage = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     } else {
         @panic("Unsupported layout transition!");
     }
