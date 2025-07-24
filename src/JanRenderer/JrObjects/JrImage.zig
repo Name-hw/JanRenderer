@@ -108,7 +108,7 @@ pub fn transition_image_layout(self: *Self, command_buffer: c.VkCommandBuffer, n
     var sourceStage: c.VkPipelineStageFlags = 0;
     var destinationStage: c.VkPipelineStageFlags = 0;
 
-    if (old_layout == c.VK_IMAGE_LAYOUT_UNDEFINED and
+    if (old_layout == c.VK_IMAGE_LAYOUT_UNDEFINED and // VK_IMAGE_LAYOUT_UNDEFINED -> VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
         new_layout == c.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
     {
         barrier.srcAccessMask = 0;
@@ -116,7 +116,7 @@ pub fn transition_image_layout(self: *Self, command_buffer: c.VkCommandBuffer, n
 
         sourceStage = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = c.VK_PIPELINE_STAGE_TRANSFER_BIT;
-    } else if (old_layout == c.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL and
+    } else if (old_layout == c.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL and // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL -> VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         new_layout == c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
     {
         barrier.srcAccessMask = c.VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -124,7 +124,15 @@ pub fn transition_image_layout(self: *Self, command_buffer: c.VkCommandBuffer, n
 
         sourceStage = c.VK_PIPELINE_STAGE_TRANSFER_BIT;
         destinationStage = c.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    } else if (old_layout == c.VK_IMAGE_LAYOUT_UNDEFINED and
+    } else if (old_layout == c.VK_IMAGE_LAYOUT_UNDEFINED and // VK_IMAGE_LAYOUT_UNDEFINED -> VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        new_layout == c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+    {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        sourceStage = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    } else if (old_layout == c.VK_IMAGE_LAYOUT_UNDEFINED and // VK_IMAGE_LAYOUT_UNDEFINED -> VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         new_layout == c.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
     {
         barrier.srcAccessMask = 0;
@@ -133,14 +141,23 @@ pub fn transition_image_layout(self: *Self, command_buffer: c.VkCommandBuffer, n
 
         sourceStage = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = c.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    } else if (old_layout == c.VK_IMAGE_LAYOUT_UNDEFINED and
-        new_layout == c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+    } else if (old_layout == c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL and // VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_UNDEFINED
+        new_layout == c.VK_IMAGE_LAYOUT_UNDEFINED)
     {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+        barrier.srcAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barrier.dstAccessMask = 0;
 
-        sourceStage = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        sourceStage = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        destinationStage = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    } else if (old_layout == c.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL and // VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_UNDEFINED
+        new_layout == c.VK_IMAGE_LAYOUT_UNDEFINED)
+    {
+        barrier.srcAccessMask = c.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+            c.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        barrier.dstAccessMask = 0;
+
+        sourceStage = c.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        destinationStage = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     } else {
         @panic("Unsupported layout transition!");
     }
