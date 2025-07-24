@@ -57,8 +57,6 @@ struct JrVulkanContext {
   VkFormat *swapchainFormat;
   VkExtent2D *swapchainExtent;
 
-  VkRenderPass *renderPass;
-
   VmaAllocator *vmaAllocator;
 };
 

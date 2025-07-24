@@ -172,9 +172,7 @@ private:
   std::vector<std::unique_ptr<JrImage>> swapChainImages;
   VkFormat swapChainImageFormat;
   VkExtent2D swapChainExtent;
-  std::vector<VkFramebuffer> swapChainFramebuffers;
 
-  VkRenderPass renderPass;
   VkDescriptorSetLayout descriptorSetLayout;
   VkPipelineLayout pipelineLayout;
   VkPipeline graphicsPipeline;
@@ -325,7 +323,6 @@ private:
   VkPresentModeKHR chooseSwapPresentMode(
       const std::vector<VkPresentModeKHR> &availablePresentModes);
   VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
-  void createRenderPass();
   void createDescriptorSetLayout();
   void createComputeDescriptorSetLayout();
   void createGraphicsPipeline();
@@ -338,7 +335,6 @@ private:
   VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates,
                                VkImageTiling tiling,
                                VkFormatFeatureFlags features);
-  void createFramebuffers();
   void createTextureImage();
   void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth,
                        int32_t texHeight, uint32_t mipLevels);
