@@ -21,10 +21,10 @@ pub const FontSet = struct {
     bold: zgui.Font,
 
     pub fn init(self: *FontSet, allocator: std.mem.Allocator) !void {
-        self.light = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Light.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
-        self.regular = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Regular.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
-        self.medium = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Medium.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
-        self.bold = zgui.io.addFontFromFileWithConfig(try std.fmt.allocPrintZ(allocator, "assets/fonts/{s}/{s}-Bold.otf", .{ self.name, self.name }), 16.0, null, zgui.io.getGlyphRangesKorean());
+        self.light = zgui.io.addFontFromFile(try std.fmt.allocPrintSentinel(allocator, "assets/fonts/{s}/{s}-Light.otf", .{ self.name, self.name }, 0), 16.0);
+        self.regular = zgui.io.addFontFromFile(try std.fmt.allocPrintSentinel(allocator, "assets/fonts/{s}/{s}-Regular.otf", .{ self.name, self.name }, 0), 16.0);
+        self.medium = zgui.io.addFontFromFile(try std.fmt.allocPrintSentinel(allocator, "assets/fonts/{s}/{s}-Medium.otf", .{ self.name, self.name }, 0), 16.0);
+        self.bold = zgui.io.addFontFromFile(try std.fmt.allocPrintSentinel(allocator, "assets/fonts/{s}/{s}-Bold.otf", .{ self.name, self.name }, 0), 16.0);
     }
 };
 
@@ -80,6 +80,7 @@ pub fn init(self: *Self, allocator: std.mem.Allocator) void {
     createSyncObjects(self);
 
     self.init_info = zgui.backend.ImGui_ImplVulkan_InitInfo{
+        .api_version = c.VK_API_VERSION_1_4,
         .instance = self.vulkan_ctx.instance.*,
         .physical_device = self.vulkan_ctx.physical_device.*,
         .device = self.vulkan_ctx.device.*,
@@ -123,7 +124,7 @@ pub fn init(self: *Self, allocator: std.mem.Allocator) void {
     zgui.io.setDefaultFont(self.font_set.regular);
 }
 
-pub fn checkVkResult(err: u32) callconv(.C) void {
+pub fn checkVkResult(err: u32) callconv(.c) void {
     if (err != c.VK_SUCCESS) @panic("Imgui error!");
 }
 
@@ -316,7 +317,7 @@ pub fn recreateSwapchain(self: *Self) void {
     createFramebuffers(self);
 }
 
-pub fn render(self: *Self, imageIndex: u32, waitSemaphoreCount: u32, pWaitSemaphores: *c.VkSemaphore, fence: c.VkFence) void {
+pub fn render(self: *Self, imageIndex: u32, p_wait_semaphores_slice: *[]c.VkSemaphore, fence: c.VkFence) void {
     _ = c.vkResetCommandBuffer.?(self.command_buffers[self.current_frame], 0);
 
     recordCommandBuffer(self, imageIndex);
@@ -327,8 +328,8 @@ pub fn render(self: *Self, imageIndex: u32, waitSemaphoreCount: u32, pWaitSemaph
 
     var submitInfo = c.VkSubmitInfo{
         .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .waitSemaphoreCount = waitSemaphoreCount,
-        .pWaitSemaphores = pWaitSemaphores,
+        .waitSemaphoreCount = @intCast(p_wait_semaphores_slice.len),
+        .pWaitSemaphores = p_wait_semaphores_slice.ptr,
         .pWaitDstStageMask = &waitStages,
         .commandBufferCount = 1,
         .pCommandBuffers = &self.command_buffers[self.current_frame],

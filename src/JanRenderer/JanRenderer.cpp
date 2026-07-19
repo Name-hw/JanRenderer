@@ -66,7 +66,7 @@ uniquePtrVectorToRawPtrArray(std::vector<std::unique_ptr<T>> &uniquePtrs) {
 
 template <typename T, int N>
 T *(*uniquePtrVectorToRawPtrArrayPtr(
-    std::vector<std::unique_ptr<T>> &uniquePtrs))[N] {
+    std::vector<std::unique_ptr<T>> &uniquePtrs)) [N] {
   // static std::array<T *, N> rawPtrs =
   //     uniquePtrVectorToRawPtrArray<T, N>(uniquePtrs);
   // T *(*rawPtrsPtr)[N] = reinterpret_cast<T *(*)[N]>(&rawPtrs);
@@ -2146,7 +2146,11 @@ void JanRenderer::drawFrame() {
     throw std::runtime_error("failed to submit draw command buffer!");
   }
 
-  jrGui_render(gui, imageIndex, 1, signalSemaphores, nullptr);
+  // GUI rendering
+  ZigSlice<VkSemaphore> guiSignalSemaphores =
+      ZigSlice<VkSemaphore>{signalSemaphores, 1};
+
+  jrGui_render(gui, imageIndex, &guiSignalSemaphores, nullptr);
 
   // Transition for presentation
   ZigSlice<VkSemaphore> transitionWaitSemaphores =
@@ -2366,8 +2370,7 @@ void JanRenderer::recordComputeCommandBuffer(
   barrier.buffer = shaderStorageBuffers[currentFrame];
   barrier.offset = 0;
   barrier.size = sizeof(Particle) * PARTICLE_COUNT;
-  vkCmdPipelineBarrier(computeCommandBuffer,
-                       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+  vkCmdPipelineBarrier(computeCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1,
                        &barrier, 0, nullptr);
 

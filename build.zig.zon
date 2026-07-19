@@ -25,16 +25,16 @@
     // internet connectivity.
     .dependencies = .{
         .zmath = .{
-            .url = "git+https://github.com/zig-gamedev/zmath.git#ccf7297ef6c01e21b2d51ad81b5b6ce929e86a00",
-            .hash = "zmath-0.11.0-dev-wjwivZY1AwDO7yxNmZ5HWoU03f9mFBet8LN9-oYc3i29",
+            .url = "git+https://github.com/zig-gamedev/zmath.git#9e42b04a24c970a297b365f3d3022f92dbf3219d",
+            .hash = "zmath-0.11.0-dev-wjwivTwtAwDOjG2_KGP-HLtHrONfsFfHttalmxFAGVAK",
         },
         .zglfw = .{
-            .url = "git+https://github.com/zig-gamedev/zglfw.git#75ab44d1bff1c16585ceeacf2db5d7909afefa83",
-            .hash = "zglfw-0.10.0-dev-zgVDNN6bIQDOl1vEb15vC3PJ1Nrg8cP1m3DFJlDOzhgd",
+            .url = "git+https://github.com/zig-gamedev/zglfw.git#51003c105d23db378bb59ce415a387b22f1b0892",
+            .hash = "zglfw-0.10.0-dev-zgVDNIy4IQDJNRy4jrP1As-SZxfJpuWhU1iJ-wBab_VD",
         },
         .zgui = .{
-            .url = "git+https://github.com/zig-gamedev/zgui#b2f29f14bce688ec90a26a9a7906543d98e0f8a0",
-            .hash = "zgui-0.6.0-dev--L6sZBDaaAAs88V6Y7ALQ_OU1KHG88hUYlKlrJdMEGsD",
+            .url = "git+https://github.com/zig-gamedev/zgui.git#bfbebed372723d1f585f86fc0a550232b3427f4d",
+            .hash = "zgui-0.6.0-dev--L6sZJhIbgAjWdK5h6xuVUrsOcD-RdqEOEPf03Zgi4mF",
         },
     },
     .paths = .{
