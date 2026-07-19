@@ -64,9 +64,9 @@ pub inline fn glm_mat4_mulv(m: cglm.mat4, v: cglm.vec4, dest: *cglm.vec4) void {
     cglm.glmm_store(dest, x1);
 }
 
-pub inline fn glms_mat4_mulv(m: cglm.mat4s, v: cglm.vec4s) cglm.vec4s {
+pub fn glms_mat4_mulv(m: cglm.mat4s, v: cglm.vec4s) cglm.vec4s {
     var r: cglm.vec4s = cglm.glms_vec4_zero();
-    glm_mat4_mulv(@as(*cglm.mat4, @ptrCast(@alignCast(@constCast(&m.raw)))).*, @as(*cglm.vec4, @ptrCast(@alignCast(@constCast(&v.raw)))).*, @as(*cglm.vec4, @ptrCast(@alignCast(&r.raw))));
+    glm_mat4_mulv(@as(*cglm.mat4, @ptrCast(@alignCast(@constCast(&m.raw[@as(usize, @intCast(0))])))).*, @as(*cglm.vec4, @ptrCast(@alignCast(@constCast(&v.raw[@as(usize, @intCast(0))])))).*, @as(*cglm.vec4, @ptrCast(@constCast(&r.raw[@as(usize, @intCast(0))]))));
     return r;
 }
 

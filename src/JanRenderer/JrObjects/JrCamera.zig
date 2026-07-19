@@ -158,6 +158,8 @@ pub fn scrollCallback(window: *zglfw.Window, xoffset: f64, yoffset: f64) void {
 pub fn update(self: *Self, deltaTime: f32) void {
     //std.debug.print("({d}, {d}, {d}), ({d}, {d}, {d})\n", .{ self.position.unnamed_0.x, self.position.unnamed_0.y, self.position.unnamed_0.z, self.velocity.unnamed_0.x, self.velocity.unnamed_0.y, self.velocity.unnamed_0.z });
 
-    const cameraRotation: c.mat4s = getRotationMatrix(self);
-    self.position = c.glms_vec3_add(self.position, c.glms_vec4_copy3(FixedCglm.glms_mat4_mulv(cameraRotation, c.glms_vec4(c.glms_vec3_scale(self.velocity, deltaTime), 0.0))));
+    const camera_rotation: zmath.Mat = zmath.matFromArr(@as(*[16]f32, @ptrCast(@constCast(&getRotationMatrix(self)))).*);
+    const next_position = zmath.vecToArr3(zmath.loadArr3(@as(*[3]f32, @ptrCast(@constCast(&self.position))).*) + zmath.mul(camera_rotation, zmath.loadArr3(@as(*[3]f32, @ptrCast(@constCast(&c.glms_vec3_scale(self.velocity, deltaTime)))).*)));
+
+    self.position = c.glms_vec3_make(&next_position);
 }

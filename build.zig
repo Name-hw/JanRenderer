@@ -23,7 +23,8 @@ fn findCSourceFiles(b: *std.Build, absoluteDir: std.fs.Dir, fileNames: ?[]const 
     var dir_walker = try absoluteDir.walk(b.allocator);
     defer dir_walker.deinit();
 
-    var src_files_arrayList = std.ArrayList([]const u8).init(b.allocator);
+    var src_files_arrayList: std.ArrayList([]const u8) = .empty;
+    defer src_files_arrayList.deinit(b.allocator);
 
     if (fileNames) |fileNames_| {
         while (try dir_walker.next()) |entry| {
@@ -31,7 +32,7 @@ fn findCSourceFiles(b: *std.Build, absoluteDir: std.fs.Dir, fileNames: ?[]const 
                 if (mem.eql(u8, entry.basename, fileName)) {
                     const path = try absolutePathToRelative(b, entry.path);
 
-                    try src_files_arrayList.append(path);
+                    try src_files_arrayList.append(b.allocator, path);
                 }
             }
         }
@@ -40,11 +41,12 @@ fn findCSourceFiles(b: *std.Build, absoluteDir: std.fs.Dir, fileNames: ?[]const 
             if (entry.kind == .file and mem.endsWith(u8, entry.basename, "c") and mem.endsWith(u8, entry.basename, "h")) {
                 const path = try absolutePathToRelative(b, entry.path);
 
-                try src_files_arrayList.append(path);
+                try src_files_arrayList.append(b.allocator, path);
             }
         }
     }
-    return src_files_arrayList.items;
+
+    return try src_files_arrayList.toOwnedSlice(b.allocator);
 }
 
 fn addPkg_C(b: *std.Build, pkg_name: []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !*std.Build.Step.Compile {
@@ -163,28 +165,29 @@ fn addPkg_C(b: *std.Build, pkg_name: []const u8, target: std.Build.ResolvedTarge
 //}
 
 fn addShaderCommands(b: *std.Build) !*std.Build.Step.Run {
+    const io = b.graph.io;
     // current working directory
-    const cwd = fs.cwd();
+    const cwd = std.Io.Dir.cwd();
 
     const asset_shaders_path = b.path("assets/shaders/");
-    var asset_shaders_dir = try cwd.openDir(asset_shaders_path.getPath(b), .{ .iterate = true });
-    defer asset_shaders_dir.close();
+    var asset_shaders_dir = try cwd.openDir(io, asset_shaders_path.getPath(b), .{ .iterate = true });
+    defer asset_shaders_dir.close(io);
 
     var dir_iterator = asset_shaders_dir.iterate();
 
-    var shader_commandArrayList = std.ArrayList([]const u8).init(b.allocator);
-    defer shader_commandArrayList.deinit();
+    var shader_commandArrayList: std.ArrayList([]const u8) = .empty;
+    defer shader_commandArrayList.deinit(b.allocator);
 
-    while (try dir_iterator.next()) |entry| {
+    while (try dir_iterator.next(io)) |entry| {
         if (entry.kind == .file and !mem.endsWith(u8, entry.name, ".spv")) {
             const shader_name = try b.allocator.dupe(u8, entry.name);
             const shader_command = try std.fmt.allocPrint(b.allocator, "glslc {s} -o {s}.spv", .{ shader_name, shader_name });
 
-            try shader_commandArrayList.append(shader_command);
+            try shader_commandArrayList.append(b.allocator, shader_command);
         }
     }
 
-    const shader_commands: [][]const u8 = try shader_commandArrayList.toOwnedSlice();
+    const shader_commands: [][]const u8 = try shader_commandArrayList.toOwnedSlice(b.allocator);
 
     const shader_cmd = b.addSystemCommand(shader_commands);
     shader_cmd.setCwd(asset_shaders_path);
@@ -226,7 +229,7 @@ pub fn build(b: *std.Build) !void {
     const zgui_module = zgui.module("root");
     const zgui_lib = zgui.artifact("imgui");
     zgui_lib.root_module.addCMacro("IMGUI_IMPL_VULKAN_USE_VOLK", "");
-    zgui_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/")); // to include vulkan
+    zgui_lib.root_module.addIncludePath(b.path("vcpkg_installed/x64-windows/include/")); // to include vulkan
 
     //const installArtifacts = [2]*std.Build.Step.InstallArtifact{
     //    b.addInstallArtifact(zglfw_lib, .{}),
@@ -247,18 +250,20 @@ pub fn build(b: *std.Build) !void {
     lib_step.dependOn(&zglfw_lib.step);
     lib_step.dependOn(&zgui_lib.step);
 
-    const JrObjects_lib = b.addStaticLibrary(.{
+    const JrObjects_lib = b.addLibrary(.{
         .name = "JrObjects",
-        .root_source_file = b.path("src/JanRenderer/JrObjects/exports.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.addModule("JrObjects", .{
+            .root_source_file = b.path("src/JanRenderer/JrObjects/exports.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
     });
     // JrObjects_lib C source
-    JrObjects_lib.linkLibC();
-    JrObjects_lib.addIncludePath(b.path("include/"));
+    JrObjects_lib.root_module.addIncludePath(b.path("include/"));
     // JrObjects_lib vcpkg library
-    JrObjects_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
-    JrObjects_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+    JrObjects_lib.root_module.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
+    JrObjects_lib.root_module.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
     // JrObjects_lib zig library
     JrObjects_lib.root_module.addImport("zmath", zmath_module);
     JrObjects_lib.root_module.addImport("zglfw", zglfw_module);
@@ -294,24 +299,26 @@ pub fn build(b: *std.Build) !void {
     //test_step.dependOn(&JrObjects_unit_tests.step);
 
     // JanRenderer_lib
-    const JanRenderer_lib = b.addStaticLibrary(.{
+    const JanRenderer_lib = b.addLibrary(.{
         .name = "JanRenderer",
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.addModule("JanRenderer", .{
+            .target = target,
+            .optimize = optimize,
+            .link_libcpp = true,
+        }),
     });
     // JanRenderer_lib C source
-    JanRenderer_lib.linkLibCpp();
-    JanRenderer_lib.addIncludePath(b.path("include/"));
-    JanRenderer_lib.addCSourceFiles(.{ .root = b.path("src/JanRenderer/"), .files = CSourceFiles, .flags = CFlags });
+    JanRenderer_lib.root_module.addIncludePath(b.path("include/"));
+    JanRenderer_lib.root_module.addCSourceFiles(.{ .root = b.path("src/JanRenderer/"), .files = CSourceFiles, .flags = CFlags });
     // JanRenderer_lib vcpkg library
-    JanRenderer_lib.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
-    JanRenderer_lib.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
+    JanRenderer_lib.root_module.addIncludePath(b.path("vcpkg_installed/x64-windows/include/"));
+    JanRenderer_lib.root_module.addLibraryPath(b.path("vcpkg_installed/x64-windows/lib/"));
     JanRenderer_lib.installHeadersDirectory(b.path("vcpkg_installed/x64-windows/include/cglm/"), "cglm", .{});
     // JanRenderer_lib zig library
-    JanRenderer_lib.linkLibrary(zglfw_lib);
-    JanRenderer_lib.linkLibrary(zgui_lib);
-    JanRenderer_lib.addIncludePath(zgui.path("libs/imgui"));
-    JanRenderer_lib.linkLibrary(JrObjects_lib);
+    JanRenderer_lib.root_module.linkLibrary(zglfw_lib);
+    JanRenderer_lib.root_module.linkLibrary(zgui_lib);
+    JanRenderer_lib.root_module.addIncludePath(zgui.path("libs/imgui"));
+    JanRenderer_lib.root_module.linkLibrary(JrObjects_lib);
 
     const lib_installArtifact = b.addInstallArtifact(JanRenderer_lib, .{});
 
@@ -322,18 +329,19 @@ pub fn build(b: *std.Build) !void {
         .name = "TestApp",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
-        .root_source_file = b.path("src/TestApp/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.addModule("TestApp", .{
+            .root_source_file = b.path("src/TestApp/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .link_libcpp = true,
+        }),
     });
-    // TestApp_exe C source
-    TestApp_exe.linkLibC();
-    TestApp_exe.linkLibCpp();
     // TestApp_exe zig library
-    TestApp_exe.addIncludePath(b.path("zig-out/include/"));
-    TestApp_exe.addLibraryPath(b.path("zig-out/lib/"));
-    TestApp_exe.linkLibrary(JanRenderer_lib);
-    TestApp_exe.linkLibrary(JrObjects_lib);
+    TestApp_exe.root_module.addIncludePath(b.path("zig-out/include/"));
+    TestApp_exe.root_module.addLibraryPath(b.path("zig-out/lib/"));
+    TestApp_exe.root_module.linkLibrary(JanRenderer_lib);
+    TestApp_exe.root_module.linkLibrary(JrObjects_lib);
 
     const exe_installArtifact = b.addInstallArtifact(TestApp_exe, .{});
 

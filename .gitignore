@@ -1,4 +1,5 @@
 vcpkg_installed/
 .zig-cache/
 zig-out/
+zig-pkg/
 bin/
