@@ -209,7 +209,7 @@ pub fn build(b: *std.Build) !void {
     // select between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we
     // do not set a preferred release mode, allowing the user to decide how to
     // optimize.
-    const optimize = b.standardOptimizeOption(.{});
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .Debug });
 
     //const optimize_pkg = .ReleaseFast;
 

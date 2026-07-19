@@ -20,11 +20,13 @@ pub const FontSet = struct {
     medium: zgui.Font,
     bold: zgui.Font,
 
-    pub fn init(self: *FontSet, allocator: std.mem.Allocator) !void {
-        self.light = zgui.io.addFontFromFile(try std.fmt.allocPrintSentinel(allocator, "assets/fonts/{s}/{s}-Light.otf", .{ self.name, self.name }, 0), 16.0);
-        self.regular = zgui.io.addFontFromFile(try std.fmt.allocPrintSentinel(allocator, "assets/fonts/{s}/{s}-Regular.otf", .{ self.name, self.name }, 0), 16.0);
-        self.medium = zgui.io.addFontFromFile(try std.fmt.allocPrintSentinel(allocator, "assets/fonts/{s}/{s}-Medium.otf", .{ self.name, self.name }, 0), 16.0);
-        self.bold = zgui.io.addFontFromFile(try std.fmt.allocPrintSentinel(allocator, "assets/fonts/{s}/{s}-Bold.otf", .{ self.name, self.name }, 0), 16.0);
+    pub fn init(self: *FontSet) !void {
+        var buffer: [128]u8 = undefined;
+
+        self.light = zgui.io.addFontFromFile(try std.fmt.bufPrintSentinel(&buffer, "assets/fonts/{s}/{s}-Light.otf", .{ self.name, self.name }, 0), 16.0);
+        self.regular = zgui.io.addFontFromFile(try std.fmt.bufPrintSentinel(&buffer, "assets/fonts/{s}/{s}-Regular.otf", .{ self.name, self.name }, 0), 16.0);
+        self.medium = zgui.io.addFontFromFile(try std.fmt.bufPrintSentinel(&buffer, "assets/fonts/{s}/{s}-Medium.otf", .{ self.name, self.name }, 0), 16.0);
+        self.bold = zgui.io.addFontFromFile(try std.fmt.bufPrintSentinel(&buffer, "assets/fonts/{s}/{s}-Bold.otf", .{ self.name, self.name }, 0), 16.0);
     }
 };
 
@@ -102,6 +104,7 @@ pub fn init(self: *Self, allocator: std.mem.Allocator) void {
     var font_set = allocator.create(FontSet) catch {
         @panic("Failed to create font set!");
     };
+    defer allocator.destroy(font_set);
     font_set.* = FontSet{
         .name = "Pretendard",
         .light = undefined,
@@ -109,7 +112,7 @@ pub fn init(self: *Self, allocator: std.mem.Allocator) void {
         .medium = undefined,
         .bold = undefined,
     };
-    font_set.init(allocator) catch @panic("Failed to initialize font set!");
+    font_set.init() catch @panic("Failed to initialize font set!");
 
     self.font_set = font_set;
     self.style = zgui.getStyle();
@@ -118,14 +121,17 @@ pub fn init(self: *Self, allocator: std.mem.Allocator) void {
 
     const configFlags = zgui.ConfigFlags{
         .dock_enable = true,
-        .viewport_enable = true,
+        .viewport_enable = false,
     };
     zgui.io.setConfigFlags(configFlags);
     zgui.io.setDefaultFont(self.font_set.regular);
 }
 
 pub fn checkVkResult(err: u32) callconv(.c) void {
-    if (err != c.VK_SUCCESS) @panic("Imgui error!");
+    if (err != c.VK_SUCCESS) {
+        std.debug.print("Vulkan error in ImGui: {}\n", .{err});
+        @panic("Imgui error!");
+    }
 }
 
 pub fn createGuiRenderPass(self: *Self) void {

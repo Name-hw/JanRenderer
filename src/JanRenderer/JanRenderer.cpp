@@ -521,12 +521,25 @@ void JanRenderer::createInstance() {
     createInfo.ppEnabledLayerNames = validationLayers.data();
 
     populateDebugMessengerCreateInfo(debugCreateInfo);
-    createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
+
+    VkValidationFeaturesEXT validationCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+        .pNext = nullptr,
+        .enabledValidationFeatureCount =
+            static_cast<uint32_t>(validationFeatures.size()),
+        .pEnabledValidationFeatures = validationFeatures.data(),
+    };
+    debugCreateInfo.pNext = &validationCreateInfo;
+    createInfo.pNext = &debugCreateInfo;
   } else {
     createInfo.enabledLayerCount = 0;
+    createInfo.ppEnabledLayerNames = nullptr;
 
     createInfo.pNext = nullptr;
   }
+
+  std ::cout << "Validation layers enabled: " << enableValidationLayers
+             << std::endl;
 
   if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
     throw std::runtime_error("failed to create instance!");
@@ -724,6 +737,8 @@ void JanRenderer::createLogicalDevice() {
   createInfo.queueCreateInfoCount =
       static_cast<uint32_t>(queueCreateInfos.size());
   createInfo.pQueueCreateInfos = queueCreateInfos.data();
+  createInfo.enabledLayerCount = 0;
+  createInfo.ppEnabledLayerNames = nullptr;
   createInfo.enabledExtensionCount =
       static_cast<uint32_t>(deviceExtensions.size());
   createInfo.ppEnabledExtensionNames = deviceExtensions.data();
@@ -732,14 +747,6 @@ void JanRenderer::createLogicalDevice() {
 
   for (const auto &extension : deviceExtensions) {
     std::cout << '\t' << extension << '\n';
-  }
-
-  if (enableValidationLayers) {
-    createInfo.enabledLayerCount =
-        static_cast<uint32_t>(validationLayers.size());
-    createInfo.ppEnabledLayerNames = validationLayers.data();
-  } else {
-    createInfo.enabledLayerCount = 0;
   }
 
   if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) !=
@@ -833,8 +840,8 @@ void JanRenderer::createSwapChain() {
   }
 
   vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
-  VkImage *images = new VkImage[imageCount];
-  vkGetSwapchainImagesKHR(device, swapChain, &imageCount, images);
+  std::vector<VkImage> images(imageCount);
+  vkGetSwapchainImagesKHR(device, swapChain, &imageCount, images.data());
 
   swapChainImages.reserve(imageCount);
 
@@ -2095,8 +2102,10 @@ void JanRenderer::drawFrame() {
   computeSubmitInfo.pSignalSemaphores =
       &computeFinishedSemaphores[currentFrame];
 
-  if (vkQueueSubmit(computeQueue, 1, &computeSubmitInfo,
-                    computeInFlightFences[currentFrame]) != VK_SUCCESS) {
+  VkResult result = vkQueueSubmit(computeQueue, 1, &computeSubmitInfo,
+                                  computeInFlightFences[currentFrame]);
+  if (result != VK_SUCCESS) {
+    std::cerr << "vkQueueSubmit failed with VkResult: " << result << std::endl;
     throw std::runtime_error("Failed to submit compute command buffer!");
   };
 
@@ -2105,9 +2114,9 @@ void JanRenderer::drawFrame() {
                   UINT64_MAX);
 
   uint32_t imageIndex;
-  VkResult result = vkAcquireNextImageKHR(
-      device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame],
-      VK_NULL_HANDLE, &imageIndex);
+  result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX,
+                                 imageAvailableSemaphores[currentFrame],
+                                 VK_NULL_HANDLE, &imageIndex);
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     recreateSwapChain();
@@ -2141,8 +2150,10 @@ void JanRenderer::drawFrame() {
   graphicsSubmitInfo.signalSemaphoreCount = 1;
   graphicsSubmitInfo.pSignalSemaphores = signalSemaphores;
 
-  if (vkQueueSubmit(graphicsQueue, 1, &graphicsSubmitInfo, nullptr) !=
-      VK_SUCCESS) {
+  result = vkQueueSubmit(graphicsQueue, 1, &graphicsSubmitInfo, nullptr);
+
+  if (result != VK_SUCCESS) {
+    std::cerr << "vkQueueSubmit failed with VkResult: " << result << std::endl;
     throw std::runtime_error("failed to submit draw command buffer!");
   }
 
@@ -2333,7 +2344,7 @@ void JanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
   jrShader_bindShader(particleVertShader.get(), commandBuffer);
   jrShader_bindShader(particleFragShader.get(), commandBuffer);
 
-  vkCmdBindVertexBuffers(commandBuffer, 0, 1,
+  vkCmdBindVertexBuffers(commandBuffer, 1, 1,
                          &shaderStorageBuffers[currentFrame], offsets);
 
   vkCmdDraw(commandBuffer, PARTICLE_COUNT, 1, 0, 0);
@@ -2478,6 +2489,7 @@ void JanRenderer::cleanup() {
     vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
     vkDestroySemaphore(device, computeFinishedSemaphores[i], nullptr);
     vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+    vkDestroySemaphore(device, presentReadySemaphores[i], nullptr);
 
     vkDestroyFence(device, inFlightFences[i], nullptr);
     vkDestroyFence(device, computeInFlightFences[i], nullptr);

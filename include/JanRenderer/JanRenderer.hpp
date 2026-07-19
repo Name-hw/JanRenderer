@@ -134,13 +134,17 @@ const std::string TEXTURE_PATH = "assets/textures/viking_room.png";
 const std::vector<const char *> validationLayers = {
     "VK_LAYER_KHRONOS_validation"};
 
+const std::vector<VkValidationFeatureEnableEXT> validationFeatures = {
+    // VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+};
+
 const std::vector<const char *> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_SHADER_OBJECT_EXTENSION_NAME};
 
-#ifdef _DEBUG
-const bool enableValidationLayers = true;
-#else
+#ifdef NDEBUG
 const bool enableValidationLayers = false;
+#else
+const bool enableValidationLayers = true;
 #endif
 
 class JanRenderer {
